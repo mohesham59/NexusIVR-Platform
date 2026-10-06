@@ -401,6 +401,7 @@ function renderVariable(node: FlowNode, nodes: FlowNode[], edges: FlowEdge[]): s
   const next = firstTarget(node.id, edges)
   const nextId = gotoId(next, nodes)
   const varName = node.variableName || `var_${slugify(node.title)}`
+  const varValue = node.variableValue || '1'
   let safeVarValue = varValue;
   if (!/^['"].*['"]$/.test(safeVarValue)) {
     safeVarValue = `'${safeVarValue}'`;

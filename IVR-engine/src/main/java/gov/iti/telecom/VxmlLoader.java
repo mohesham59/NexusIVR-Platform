@@ -116,22 +116,24 @@ public class VxmlLoader {
             throw new IllegalArgumentException("VXML name cannot be null or empty");
         }
 
+        String cleanName = cleanVxmlName(vxmlName);
+
         // Return cached copy if available and caching is enabled
         if (cachingEnabled) {
-            Document cached = documentCache.get(vxmlName);
+            Document cached = documentCache.get(cleanName);
             if (cached != null) {
-                System.out.println("[VxmlLoader] Returning cached VXML: " + vxmlName);
+                System.out.println("[VxmlLoader] Returning cached VXML: " + cleanName);
                 return cached;
             }
         }
 
         // Load from file system
-        Path filePath = resourcePath.resolve(vxmlName + VXML_EXTENSION);
-        if (Files.exists(filePath)) {
+        Path filePath = resolveVxmlPath(cleanName);
+        if (filePath != null && Files.exists(filePath)) {
             System.out.println("[VxmlLoader] Loading VXML from file: " + filePath.toAbsolutePath());
             Document doc = loadVxmlFromPath(filePath);
             if (cachingEnabled) {
-                documentCache.put(vxmlName, doc);
+                documentCache.put(cleanName, doc);
             }
             return doc;
         }
@@ -141,22 +143,83 @@ public class VxmlLoader {
         if (resourceDir.endsWith("/")) {
             resourceDir = resourceDir.substring(0, resourceDir.length() - 1);
         }
-        String classpathResource = resourceDir + "/" + vxmlName + VXML_EXTENSION;
+        String classpathResource = resourceDir + "/" + cleanName + VXML_EXTENSION;
         InputStream inputStream = getClass().getClassLoader()
                 .getResourceAsStream(classpathResource);
         if (inputStream != null) {
             System.out.println("[VxmlLoader] Loading VXML from classpath: " + classpathResource);
             Document doc = loadVxmlFromInputStream(inputStream, classpathResource);
             if (cachingEnabled) {
-                documentCache.put(vxmlName, doc);
+                documentCache.put(cleanName, doc);
             }
             return doc;
         }
 
         // Not found anywhere
+        Path expectedPath = resourcePath.resolve(cleanName + VXML_EXTENSION);
         throw new RuntimeException(
-                "VXML file not found: " + vxmlName + VXML_EXTENSION +
-                        " (searched: " + filePath.toAbsolutePath() + ", classpath:" + classpathResource + ")");
+                "VXML file not found: " + cleanName + VXML_EXTENSION +
+                        " (searched: " + expectedPath.toAbsolutePath() + ", classpath:" + classpathResource + ")");
+    }
+
+    private String cleanVxmlName(String name) {
+        if (name == null) return "hello";
+        String trimmed = name.trim();
+        if (trimmed.contains("?")) {
+            trimmed = trimmed.substring(0, trimmed.indexOf('?'));
+        }
+        if (trimmed.toLowerCase().endsWith(".vxml")) {
+            trimmed = trimmed.substring(0, trimmed.length() - 5);
+        } else if (trimmed.toLowerCase().endsWith(".json")) {
+            trimmed = trimmed.substring(0, trimmed.length() - 5);
+        }
+        return trimmed;
+    }
+
+    private Path resolveVxmlPath(String cleanName) {
+        Path direct = resourcePath.resolve(cleanName + VXML_EXTENSION);
+        if (Files.exists(direct)) {
+            return direct;
+        }
+        String alias = resolveScenarioAlias(cleanName);
+        if (alias != null) {
+            Path aliasPath = resourcePath.resolve(alias + VXML_EXTENSION);
+            if (Files.exists(aliasPath)) {
+                return aliasPath;
+            }
+        }
+        // Try hyphen to underscore conversion or vice versa
+        String altName = cleanName.contains("-") ? cleanName.replace('-', '_') : cleanName.replace('_', '-');
+        Path altPath = resourcePath.resolve(altName + VXML_EXTENSION);
+        if (Files.exists(altPath)) {
+            return altPath;
+        }
+        return null;
+    }
+
+    private String resolveScenarioAlias(String name) {
+        if (name == null) return null;
+        switch (name.toLowerCase()) {
+            case "pizza_palace":
+            case "pizza_palace_vxml":
+            case "pizza":
+                return "pizza_iv";
+            case "charging":
+                return "pizza_iv";
+            case "hospital":
+            case "hospital_main":
+            case "hospital_ivr_main":
+                return "hospital_ivr";
+            case "healthcare":
+            case "health":
+                return "healthcare_iv";
+            case "telecom":
+                return "telecom_iv";
+            case "banking":
+                return "banking_iv";
+            default:
+                return null;
+        }
     }
 
     /**
@@ -250,8 +313,10 @@ public class VxmlLoader {
      * }</pre>
      */
     public URI getVxmlUri(String vxmlName) throws RuntimeException {
-        Path filePath = resourcePath.resolve(vxmlName + VXML_EXTENSION);
-        if (!Files.exists(filePath)) {
+        String cleanName = cleanVxmlName(vxmlName);
+        Path filePath = resolveVxmlPath(cleanName);
+        if (filePath == null || !Files.exists(filePath)) {
+            filePath = resourcePath.resolve(cleanName + VXML_EXTENSION);
             throw new RuntimeException("VXML file not found: " + filePath.toAbsolutePath());
         }
         try {

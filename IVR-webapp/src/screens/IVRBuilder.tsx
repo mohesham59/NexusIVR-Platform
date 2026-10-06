@@ -16,8 +16,9 @@ import { INITIAL_NODES, INITIAL_EDGES, VERSIONS as INITIAL_VERSIONS } from '../i
 import { NODE_DEFS } from '../ivr/nodeConfig'
 import { sanitizeFlow, generateUniqueId } from '../ivr/flowParser'
 import { validateGraph, analyzeGraph, reconnectAfterDelete, optimizeFlow } from '../ivr/graphEngine'
-import type { FlowNode, FlowEdge, NodeType, FlowVersion } from '../ivr/types'
 import AiAssistantPanel from '../components/AiAssistantPanel'
+import IvrSimulatorTab from '../ivr/simulator/IvrSimulatorTab'
+
 
 interface LogEntry {
   id: string
@@ -134,6 +135,8 @@ export default function IVRBuilder({ onLogout }: { onLogout: () => void }) {
   const [viewport, setViewport] = useState<{ x: number; y: number; scale: number }>(() => {
     return (passedFlow as any)?.viewport ?? { x: -40, y: -80, scale: 0.82 }
   })
+  const [builderTab, setBuilderTab] = useState<'build' | 'test'>('build')
+
 
   const [libCollapsed, setLibCollapsed] = useState(false)
   const [rightTab, setRightTab] = useState<RightPanelTab>('props')
@@ -1899,6 +1902,31 @@ export default function IVRBuilder({ onLogout }: { onLogout: () => void }) {
             </span>
           )}
           <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold bg-[#FEF9C3] text-[#A16207] flex-shrink-0">DRAFT</span>
+          
+          <div className="flex items-center bg-[#F1F5F9] p-0.5 rounded-lg border border-[#E2E8F0] ml-2">
+            <button
+              onClick={() => setBuilderTab('build')}
+              className={`flex items-center gap-1.5 px-3 py-0.5 rounded-md text-xs font-bold transition-all ${
+                builderTab === 'build'
+                  ? 'bg-white text-[#2563EB] shadow-sm'
+                  : 'text-[#64748B] hover:text-[#1E293B]'
+              }`}
+            >
+              <Move className="w-3.5 h-3.5" />
+              <span>Build</span>
+            </button>
+            <button
+              onClick={() => setBuilderTab('test')}
+              className={`flex items-center gap-1.5 px-3 py-0.5 rounded-md text-xs font-bold transition-all ${
+                builderTab === 'test'
+                  ? 'bg-[#2563EB] text-white shadow-sm'
+                  : 'text-[#64748B] hover:text-[#1E293B]'
+              }`}
+            >
+              <Phone className="w-3.5 h-3.5" />
+              <span>Test</span>
+            </button>
+          </div>
         </div>
 
         <div className="w-px h-5 bg-[#E5E7EB] mx-1" />
@@ -1999,202 +2027,212 @@ export default function IVRBuilder({ onLogout }: { onLogout: () => void }) {
       </header>
 
       {/* ── MAIN BODY ───────────────────────────────────────── */}
-      <div className="flex flex-1 overflow-hidden">
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 w-full max-w-xl px-4">
-          <QuotaWarningBanner warnings={quotaWarnings} />
-        </div>
-
-        <NodeLibrary collapsed={libCollapsed} onToggle={() => setLibCollapsed(!libCollapsed)} />
-
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
-          <div className="flex-1 overflow-hidden relative flex">
-            <FlowCanvas
-              nodes={nodes}
-              edges={edges}
-              selectedId={selectedId}
-              selectedEdgeId={selectedEdgeId}
-              simulatingId={simulatingId}
-              viewport={viewport}
-              onViewportChange={setViewport}
-              onSelectNode={setSelectedId}
-              onSelectEdge={setSelectedEdgeId}
-              onMoveNode={handleMoveNode}
-              onDropNode={handleDropNode}
-              onCollapseNode={handleCollapseNode}
-              onContextMenu={handleContextMenu}
-              onAddEdge={handleAddEdge}
-            />
-
-            {selectedVersionId && (
-              <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE] px-4 py-2 rounded-xl shadow-lg">
-                <span className="w-2 h-2 rounded-full bg-[#2563EB] animate-pulse" />
-                <span className="text-xs font-semibold">Previewing version snapshots</span>
-                <button onClick={() => { const ver = versionsList.find(v => v.id === selectedVersionId); if (ver) handleRestoreVersion(ver) }} className="px-2 py-1 rounded bg-[#2563EB] text-white text-[10px] font-bold hover:bg-[#1E40AF]">Restore Version</button>
-                <button onClick={handleExitPreview} className="text-[#9CA3AF] hover:text-[#374151] text-xs">Exit Preview</button>
-              </div>
-            )}
-          </div>
-
-          <div className={`bg-white border-t border-[#E5E7EB] flex-shrink-0 transition-all ${bottomOpen ? '' : 'h-9'}`}
-            style={{ height: bottomOpen ? (isMaximized ? '450px' : `${bottomHeight}px`) : '36px' }}>
-            {bottomOpen && (
-              <div onMouseDown={handleMouseDownResize}
-                className="h-1 bg-[#E5E7EB] hover:bg-[#2563EB] cursor-ns-resize w-full transition-colors flex items-center justify-center" title="Drag to resize panel" />
-            )}
-
-            <div className="flex items-center gap-0 h-9 border-b border-[#F3F4F6] px-2">
-              {[
-                { id: 'logs' as const, label: 'Execution Logs', icon: <Info className="w-3.5 h-3.5" /> },
-                { id: 'validation' as const, label: 'Validation', icon: <ShieldCheck className="w-3.5 h-3.5" />, badge: validationItems.length },
-                { id: 'console' as const, label: 'Console', icon: <Terminal className="w-3.5 h-3.5" /> },
-              ].map(tab => (
-                <button key={tab.id} onClick={() => { setBottomTab(tab.id); setBottomOpen(true) }}
-                  className={`flex items-center gap-1.5 h-9 px-3 text-xs font-medium border-b-2 -mb-px transition-colors ${bottomTab === tab.id && bottomOpen ? 'border-[#2563EB] text-[#2563EB]' : 'border-transparent text-[#6B7280] hover:text-[#374151]'}`}>
-                  {tab.icon}{tab.label}
-                  {tab.badge === -1 ? (
-                    <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-green-50 border border-green-200 text-green-700 text-[9px] font-bold">
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-                      Applied
-                    </span>
-                  ) : tab.badge && tab.badge > 0 && (
-                    <span className="w-4 h-4 rounded-full bg-[#8B5CF6] text-white text-[9px] font-bold flex items-center justify-center">{tab.badge}</span>
-                  )}
-                </button>
-              ))}
-
-              <div className="flex-1" />
-
-              {bottomTab === 'logs' && bottomOpen && (
-                <div className="flex items-center gap-3 mr-2">
-                  <input type="text" placeholder="Search logs..." value={logSearch} onChange={e => setLogSearch(e.target.value)}
-                    className="px-2 py-0.5 border border-[#E5E7EB] rounded text-[10px] outline-none focus:border-[#2563EB] w-36 h-5" />
-                  {['all', 'info', 'warn', 'error'].map(lvl => (
-                    <button key={lvl} onClick={() => setLogFilter(lvl as any)}
-                      className={`px-1.5 py-0.2 rounded text-[9px] font-semibold uppercase ${
-                        logFilter === lvl ? 'bg-[#2563EB] text-white' : 'bg-[#F3F4F6] text-[#6B7280] hover:text-[#374151]'
-                      }`}>
-                      {lvl}
-                    </button>
-                  ))}
-                  <div className="w-px h-3.5 bg-[#E5E7EB]" />
-                  <button onClick={() => setLogs([])} className="text-[10px] text-[#6B7280] hover:text-[#EF4444] font-medium">Clear Logs</button>
-                  <button onClick={() => {
-                    const text = logs.map(l => `[${l.time}] [${l.level.toUpperCase()}] ${l.msg}`).join('\n')
-                    const blob = new Blob([text], { type: 'text/plain' })
-                    const a = document.createElement('a')
-                    a.href = URL.createObjectURL(blob)
-                    a.download = 'execution.log'
-                    a.click()
-                  }} className="text-[10px] text-[#2563EB] hover:underline font-medium">Export Logs</button>
-                </div>
-              )}
-
-              <button onClick={() => setIsMaximized(!isMaximized)} className="w-7 h-7 rounded-lg flex items-center justify-center text-[#9CA3AF] hover:bg-[#F3F4F6]">
-                {isMaximized ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-              </button>
-              <button onClick={() => setBottomOpen(!bottomOpen)} className="w-7 h-7 rounded-lg flex items-center justify-center text-[#9CA3AF] hover:bg-[#F3F4F6]">
-                {bottomOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
-              </button>
-            </div>
-
-            {bottomOpen && (
-              <div className="h-[calc(100%-40px)] overflow-y-auto px-3 py-2">
-                {bottomTab === 'logs' && (
-                  <div className="space-y-1 font-mono">
-                    {filteredLogs.map(line => (
-                      <div key={line.id} className="flex items-start gap-2.5 py-0.5 text-[11px]">
-                        <span className="text-[#9CA3AF] w-16 flex-shrink-0">{line.time}</span>
-                        <span className={`font-bold uppercase w-10 flex-shrink-0 ${
-                          line.level === 'warn' ? 'text-[#F59E0B]' : line.level === 'error' ? 'text-[#EF4444]' : 'text-[#2563EB]'
-                        }`}>{line.level}</span>
-                        <span className="text-[#374151]">{line.msg}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {bottomTab === 'ai' && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 pb-2 border-b border-[#F3F4F6]">
-                      <button onClick={handleApplyAllSuggestions} disabled={currentSuggestions.length === 0}
-                        className="px-3 py-1 bg-[#2563EB] text-white rounded text-[10px] font-semibold hover:bg-[#1E40AF] disabled:opacity-50">
-                        Apply All
-                      </button>
-                      <button onClick={handleGenerateSuggestionsAgain}
-                        className="px-3 py-1 bg-white border border-[#E5E7EB] text-[#374151] rounded text-[10px] font-medium hover:border-[#2563EB] hover:text-[#2563EB]">
-                        Generate Again
-                      </button>
-                    </div>
-                    {currentSuggestions.length === 0 ? (
-                      <p className="text-xs text-[#9CA3AF] py-4 text-center">No AI suggestions found. Your flow graph looks clean!</p>
-                    ) : (
-                      currentSuggestions.map(s => (
-                        <div key={s.id} className="flex items-center gap-3 p-2.5 rounded-lg border border-[#F3F4F6] bg-[#FAFAFA]">
-                          <span className="text-base">{s.icon}</span>
-                          <span className="text-[#374151] text-xs flex-1">{s.text}</span>
-                          <button onClick={() => {
-                            setIgnoredSuggestionIds(set => new Set(set).add(s.id))
-                            const res = s.applyAction()
-                            if (res !== false) {
-                              setAppliedSuggestionCount(prev => prev + 1)
-                            }
-                          }} className="px-2 py-1 rounded bg-[#2563EB] text-white text-[10px] font-semibold hover:bg-[#1E40AF]">Apply</button>
-                          <button onClick={() => setIgnoredSuggestionIds(set => new Set(set).add(s.id))} className="px-2 py-1 rounded bg-[#F3F4F6] text-[#6B7280] text-[10px] hover:text-[#374151]">Dismiss</button>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                )}
-                {bottomTab === 'validation' && (
-                  <div className="space-y-1.5">
-                    {validationItems.map((item, idx) => (
-                      <div key={idx} onClick={() => item.nodeId && handleSelectNodeAndCenter(item.nodeId)} className="p-2 rounded border border-[#E5E7EB] flex items-center justify-between text-xs cursor-pointer hover:border-[#2563EB] bg-white">
-                        <span className={item.type === 'error' ? 'text-[#EF4444] font-medium' : 'text-[#374151]'}>{item.message}</span>
-                        {item.nodeId && <span className="text-[10px] text-[#2563EB] font-semibold">Focus Node</span>}
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {bottomTab === 'console' && (
-                  <div className="font-mono text-xs text-[#374151] space-y-1">
-                    <p>&gt; NexusIVR Runtime Console Ready</p>
-                    <p>&gt; Connected to local PostgreSQL DB &amp; Tomcat Engine</p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="transition-all duration-300 ease-in-out" style={{ width: aiPanelOpen ? 380 : 0, overflow: 'hidden', flexShrink: 0 }}>
-          {aiPanelOpen && (
-            <AiAssistantPanel
-              onFlowGenerated={handleFlowGenerated}
-              onClose={() => setAiPanelOpen(false)}
-            />
-          )}
-        </div>
-
-        <PropertiesPanel
-          selectedNode={selectedNode}
-          selectedEdge={edges.find(e => e.id === selectedEdgeId) || null}
-          flowName={flowName}
-          nodesCount={nodes.length}
-          edgesCount={edges.length}
-          versions={versionsList}
-          validationItems={validationItems}
-          activeTab={rightTab}
-          onTabChange={setRightTab}
-          onNodeChange={handleNodeChange}
-          onEdgeChange={handleEdgeChange}
-          onRestoreVersion={handleRestoreVersion}
-          onSelectNode={handleSelectNodeAndCenter}
-          onSaveVersion={handleSave}
-          selectedVersionId={selectedVersionId}
-          onSelectVersion={handleSelectVersion}
+      {builderTab === 'test' ? (
+        <IvrSimulatorTab
           nodes={nodes}
           edges={edges}
+          flowName={flowName}
+          onSelectNode={setSelectedId}
         />
-      </div>
+      ) : (
+        <div className="flex flex-1 overflow-hidden">
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 w-full max-w-xl px-4">
+            <QuotaWarningBanner warnings={quotaWarnings} />
+          </div>
+
+          <NodeLibrary collapsed={libCollapsed} onToggle={() => setLibCollapsed(!libCollapsed)} />
+
+          <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+            <div className="flex-1 overflow-hidden relative flex">
+              <FlowCanvas
+                nodes={nodes}
+                edges={edges}
+                selectedId={selectedId}
+                selectedEdgeId={selectedEdgeId}
+                simulatingId={simulatingId}
+                viewport={viewport}
+                onViewportChange={setViewport}
+                onSelectNode={setSelectedId}
+                onSelectEdge={setSelectedEdgeId}
+                onMoveNode={handleMoveNode}
+                onDropNode={handleDropNode}
+                onCollapseNode={handleCollapseNode}
+                onContextMenu={handleContextMenu}
+                onAddEdge={handleAddEdge}
+              />
+
+              {selectedVersionId && (
+                <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE] px-4 py-2 rounded-xl shadow-lg">
+                  <span className="w-2 h-2 rounded-full bg-[#2563EB] animate-pulse" />
+                  <span className="text-xs font-semibold">Previewing version snapshots</span>
+                  <button onClick={() => { const ver = versionsList.find(v => v.id === selectedVersionId); if (ver) handleRestoreVersion(ver) }} className="px-2 py-1 rounded bg-[#2563EB] text-white text-[10px] font-bold hover:bg-[#1E40AF]">Restore Version</button>
+                  <button onClick={handleExitPreview} className="text-[#9CA3AF] hover:text-[#374151] text-xs">Exit Preview</button>
+                </div>
+              )}
+            </div>
+
+            <div className={`bg-white border-t border-[#E5E7EB] flex-shrink-0 transition-all ${bottomOpen ? '' : 'h-9'}`}
+              style={{ height: bottomOpen ? (isMaximized ? '450px' : `${bottomHeight}px`) : '36px' }}>
+              {bottomOpen && (
+                <div onMouseDown={handleMouseDownResize}
+                  className="h-1 bg-[#E5E7EB] hover:bg-[#2563EB] cursor-ns-resize w-full transition-colors flex items-center justify-center" title="Drag to resize panel" />
+              )}
+
+              <div className="flex items-center gap-0 h-9 border-b border-[#F3F4F6] px-2">
+                {[
+                  { id: 'logs' as const, label: 'Execution Logs', icon: <Info className="w-3.5 h-3.5" /> },
+                  { id: 'validation' as const, label: 'Validation', icon: <ShieldCheck className="w-3.5 h-3.5" />, badge: validationItems.length },
+                  { id: 'console' as const, label: 'Console', icon: <Terminal className="w-3.5 h-3.5" /> },
+                ].map(tab => (
+                  <button key={tab.id} onClick={() => { setBottomTab(tab.id); setBottomOpen(true) }}
+                    className={`flex items-center gap-1.5 h-9 px-3 text-xs font-medium border-b-2 -mb-px transition-colors ${bottomTab === tab.id && bottomOpen ? 'border-[#2563EB] text-[#2563EB]' : 'border-transparent text-[#6B7280] hover:text-[#374151]'}`}>
+                    {tab.icon}{tab.label}
+                    {tab.badge === -1 ? (
+                      <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-green-50 border border-green-200 text-green-700 text-[9px] font-bold">
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                        Applied
+                      </span>
+                    ) : tab.badge && tab.badge > 0 && (
+                      <span className="w-4 h-4 rounded-full bg-[#8B5CF6] text-white text-[9px] font-bold flex items-center justify-center">{tab.badge}</span>
+                    )}
+                  </button>
+                ))}
+
+                <div className="flex-1" />
+
+                {bottomTab === 'logs' && bottomOpen && (
+                  <div className="flex items-center gap-3 mr-2">
+                    <input type="text" placeholder="Search logs..." value={logSearch} onChange={e => setLogSearch(e.target.value)}
+                      className="px-2 py-0.5 border border-[#E5E7EB] rounded text-[10px] outline-none focus:border-[#2563EB] w-36 h-5" />
+                    {['all', 'info', 'warn', 'error'].map(lvl => (
+                      <button key={lvl} onClick={() => setLogFilter(lvl as any)}
+                        className={`px-1.5 py-0.2 rounded text-[9px] font-semibold uppercase ${
+                          logFilter === lvl ? 'bg-[#2563EB] text-white' : 'bg-[#F3F4F6] text-[#6B7280] hover:text-[#374151]'
+                        }`}>
+                        {lvl}
+                      </button>
+                    ))}
+                    <div className="w-px h-3.5 bg-[#E5E7EB]" />
+                    <button onClick={() => setLogs([])} className="text-[10px] text-[#6B7280] hover:text-[#EF4444] font-medium">Clear Logs</button>
+                    <button onClick={() => {
+                      const text = logs.map(l => `[${l.time}] [${l.level.toUpperCase()}] ${l.msg}`).join('\n')
+                      const blob = new Blob([text], { type: 'text/plain' })
+                      const a = document.createElement('a')
+                      a.href = URL.createObjectURL(blob)
+                      a.download = 'execution.log'
+                      a.click()
+                    }} className="text-[10px] text-[#2563EB] hover:underline font-medium">Export Logs</button>
+                  </div>
+                )}
+
+                <button onClick={() => setIsMaximized(!isMaximized)} className="w-7 h-7 rounded-lg flex items-center justify-center text-[#9CA3AF] hover:bg-[#F3F4F6]">
+                  {isMaximized ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+                </button>
+                <button onClick={() => setBottomOpen(!bottomOpen)} className="w-7 h-7 rounded-lg flex items-center justify-center text-[#9CA3AF] hover:bg-[#F3F4F6]">
+                  {bottomOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+
+              {bottomOpen && (
+                <div className="h-[calc(100%-40px)] overflow-y-auto px-3 py-2">
+                  {bottomTab === 'logs' && (
+                    <div className="space-y-1 font-mono">
+                      {filteredLogs.map(line => (
+                        <div key={line.id} className="flex items-start gap-2.5 py-0.5 text-[11px]">
+                          <span className="text-[#9CA3AF] w-16 flex-shrink-0">{line.time}</span>
+                          <span className={`font-bold uppercase w-10 flex-shrink-0 ${
+                            line.level === 'warn' ? 'text-[#F59E0B]' : line.level === 'error' ? 'text-[#EF4444]' : 'text-[#2563EB]'
+                          }`}>{line.level}</span>
+                          <span className="text-[#374151]">{line.msg}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {bottomTab === 'ai' && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 pb-2 border-b border-[#F3F4F6]">
+                        <button onClick={handleApplyAllSuggestions} disabled={currentSuggestions.length === 0}
+                          className="px-3 py-1 bg-[#2563EB] text-white rounded text-[10px] font-semibold hover:bg-[#1E40AF] disabled:opacity-50">
+                          Apply All
+                        </button>
+                        <button onClick={handleGenerateSuggestionsAgain}
+                          className="px-3 py-1 bg-white border border-[#E5E7EB] text-[#374151] rounded text-[10px] font-medium hover:border-[#2563EB] hover:text-[#2563EB]">
+                          Generate Again
+                        </button>
+                      </div>
+                      {currentSuggestions.length === 0 ? (
+                        <p className="text-xs text-[#9CA3AF] py-4 text-center">No AI suggestions found. Your flow graph looks clean!</p>
+                      ) : (
+                        currentSuggestions.map(s => (
+                          <div key={s.id} className="flex items-center gap-3 p-2.5 rounded-lg border border-[#F3F4F6] bg-[#FAFAFA]">
+                            <span className="text-base">{s.icon}</span>
+                            <span className="text-[#374151] text-xs flex-1">{s.text}</span>
+                            <button onClick={() => {
+                              setIgnoredSuggestionIds(set => new Set(set).add(s.id))
+                              const res = s.applyAction()
+                              if (res !== false) {
+                                setAppliedSuggestionCount(prev => prev + 1)
+                              }
+                            }} className="px-2 py-1 rounded bg-[#2563EB] text-white text-[10px] font-semibold hover:bg-[#1E40AF]">Apply</button>
+                            <button onClick={() => setIgnoredSuggestionIds(set => new Set(set).add(s.id))} className="px-2 py-1 rounded bg-[#F3F4F6] text-[#6B7280] text-[10px] hover:text-[#374151]">Dismiss</button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                  {bottomTab === 'validation' && (
+                    <div className="space-y-1.5">
+                      {validationItems.map((item, idx) => (
+                        <div key={idx} onClick={() => item.nodeId && handleSelectNodeAndCenter(item.nodeId)} className="p-2 rounded border border-[#E5E7EB] flex items-center justify-between text-xs cursor-pointer hover:border-[#2563EB] bg-white">
+                          <span className={item.type === 'error' ? 'text-[#EF4444] font-medium' : 'text-[#374151]'}>{item.message}</span>
+                          {item.nodeId && <span className="text-[10px] text-[#2563EB] font-semibold">Focus Node</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {bottomTab === 'console' && (
+                    <div className="font-mono text-xs text-[#374151] space-y-1">
+                      <p>&gt; NexusIVR Runtime Console Ready</p>
+                      <p>&gt; Connected to local PostgreSQL DB &amp; Tomcat Engine</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="transition-all duration-300 ease-in-out" style={{ width: aiPanelOpen ? 380 : 0, overflow: 'hidden', flexShrink: 0 }}>
+            {aiPanelOpen && (
+              <AiAssistantPanel
+                onFlowGenerated={handleFlowGenerated}
+                onClose={() => setAiPanelOpen(false)}
+              />
+            )}
+          </div>
+
+          <PropertiesPanel
+            selectedNode={selectedNode}
+            selectedEdge={edges.find(e => e.id === selectedEdgeId) || null}
+            flowName={flowName}
+            nodesCount={nodes.length}
+            edgesCount={edges.length}
+            versions={versionsList}
+            validationItems={validationItems}
+            activeTab={rightTab}
+            onTabChange={setRightTab}
+            onNodeChange={handleNodeChange}
+            onEdgeChange={handleEdgeChange}
+            onRestoreVersion={handleRestoreVersion}
+            onSelectNode={handleSelectNodeAndCenter}
+            onSaveVersion={handleSave}
+            selectedVersionId={selectedVersionId}
+            onSelectVersion={handleSelectVersion}
+            nodes={nodes}
+            edges={edges}
+          />
+        </div>
+      )}
+
 
       {contextMenu && (
         <div className="fixed z-[9999] bg-white rounded-xl border border-[#E5E7EB] shadow-2xl shadow-black/15 py-1.5 w-44 overflow-hidden"

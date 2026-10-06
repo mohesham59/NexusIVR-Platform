@@ -50,6 +50,13 @@ export interface FlowNode {
   menuOptionsCount?: number
   variableName?: string
   variableValue?: string
+  url?: string
+  saveResultAs?: string
+  jsonPath?: string
+  options?: any[]
+  conditionField?: string
+  conditionOperator?: string
+  conditionValue?: string
 }
 
 

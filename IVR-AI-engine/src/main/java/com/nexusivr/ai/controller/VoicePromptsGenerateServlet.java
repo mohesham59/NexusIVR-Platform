@@ -83,17 +83,16 @@ public class VoicePromptsGenerateServlet extends BaseAiServlet {
             Path targetWavFile = targetDir.resolve(fileName);
             String mp3File = targetWavFile.toString().replace(".wav", ".mp3");
 
-            // Python TTS Generation. Text/language/file are passed as process
-            // arguments (sys.argv), never interpolated into a -c script, so the
-            // payload cannot escape into shell/python code.
-            ProcessBuilder pbTts = new ProcessBuilder(
-                "python3", "-c",
-                "import sys; from gtts import gTTS; tts=gTTS(sys.argv[1], lang=sys.argv[2]); tts.save(sys.argv[3])",
-                text, langCode, mp3File
-            );
-            int exitTts = runAndWait(pbTts);
+            // Python gTTS generation (shared with the browser TTS preview endpoint).
+            boolean ttsOk;
+            try {
+                com.nexusivr.ai.util.GttsSynthesizer.synthesizeMp3(text, langCode, Paths.get(mp3File));
+                ttsOk = true;
+            } catch (IOException ttsError) {
+                ttsOk = false;
+            }
 
-            if (exitTts == 0 && Files.exists(Paths.get(mp3File))) {
+            if (ttsOk && Files.exists(Paths.get(mp3File))) {
                 // Convert to WAV using ffmpeg
                 ProcessBuilder pbFfmpeg = new ProcessBuilder(
                     "ffmpeg", "-y", "-i", mp3File, "-ar", "8000", "-ac", "1", "-codec:a", "pcm_s16le", targetWavFile.toString()
@@ -137,36 +136,7 @@ public class VoicePromptsGenerateServlet extends BaseAiServlet {
         }
     }
 
-    /**
-     * Runs a process, draining stdout/stderr concurrently to avoid pipe-buffer
-     * deadlocks, and enforces a timeout so a hung process cannot block a
-     * servlet thread forever.
-     */
     private static int runAndWait(ProcessBuilder pb) throws IOException, InterruptedException {
-        Process p = pb.start();
-        Thread outReader = new Thread(() -> consume(p.getInputStream()), "vp-stdout");
-        Thread errReader = new Thread(() -> consume(p.getErrorStream()), "vp-stderr");
-        outReader.setDaemon(true);
-        errReader.setDaemon(true);
-        outReader.start();
-        errReader.start();
-
-        boolean finished = p.waitFor(120, java.util.concurrent.TimeUnit.SECONDS);
-        if (!finished) {
-            System.err.println("Voice prompt process timed out: " + String.join(" ", pb.command()));
-            p.destroyForcibly();
-            throw new IOException("Voice prompt process timed out: " + pb.command().get(0));
-        }
-        return p.exitValue();
-    }
-
-    private static void consume(java.io.InputStream stream) {
-        try (java.io.InputStream in = stream) {
-            byte[] buffer = new byte[1024];
-            while (in.read(buffer) != -1) {
-                // discard output
-            }
-        } catch (Exception ignored) {
-        }
+        return com.nexusivr.ai.util.GttsSynthesizer.runAndWait(pb);
     }
 }

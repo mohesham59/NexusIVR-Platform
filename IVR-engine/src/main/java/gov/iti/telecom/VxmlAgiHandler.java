@@ -176,43 +176,83 @@ public class VxmlAgiHandler extends BaseAgiScript {
      * @param channel AGI channel
      * @return VXML name without extension (e.g., "hello", "menu-example")
      */
+    /**
+     * Determines which VXML file to execute.
+     *
+     * Priority:
+     * 1. VXML_FILE Asterisk variable (if caller set it)
+     * 2. business_name Asterisk variable
+     * 3. Query string parameter from AGI URL (e.g., ?business_name=... or ?vxml_file=...)
+     * 4. AGI request path (e.g., "/hello" from "agi://127.0.0.1:4573/hello")
+     * 5. Default: "hello"
+     *
+     * @param request AGI request from Asterisk
+     * @param channel AGI channel
+     * @return VXML name without extension
+     */
     private String determineVxmlName(AgiRequest request, AgiChannel channel)
             throws AgiException {
 
-        // Check for VXML_FILE variable first (highest priority)
+        // 1. Check VXML_FILE variable first
         try {
             String vxmlFile = channel.getVariable("VXML_FILE");
-            if (vxmlFile != null && !vxmlFile.isEmpty() && !vxmlFile.equals("0")) {
+            if (vxmlFile != null && !vxmlFile.trim().isEmpty() && !vxmlFile.equals("0")) {
                 System.out.println("[VxmlAgiHandler] Using VXML_FILE variable: " + vxmlFile);
-                String safe = sanitizeVxmlName(vxmlFile);
-                if (!safe.equals("hello")) {
-                    System.out.println("[VxmlAgiHandler] Sanitized VXML_FILE to: " + safe);
-                }
-                return safe;
+                return sanitizeVxmlName(vxmlFile);
             }
         } catch (AgiException e) {
             System.out.println("[VxmlAgiHandler] Could not read VXML_FILE variable: " + e.getMessage());
         }
 
-        // Extract from AGI request path
-        String requestPath = request.getRequestURL(); // e.g., "agi://127.0.0.1:4573/hello"
+        // 2. Check business_name variable
+        try {
+            String busName = channel.getVariable("business_name");
+            if (busName != null && !busName.trim().isEmpty() && !busName.equals("0")) {
+                System.out.println("[VxmlAgiHandler] Using business_name variable: " + busName);
+                return sanitizeVxmlName(busName);
+            }
+        } catch (AgiException e) {
+            System.out.println("[VxmlAgiHandler] Could not read business_name variable: " + e.getMessage());
+        }
+
+        // 3. Extract query params from request URL (e.g. agi://127.0.0.1:4573/ivr_platform?business_name=...)
+        String requestPath = request.getRequestURL();
+        if (requestPath != null && requestPath.contains("?")) {
+            String queryString = requestPath.substring(requestPath.indexOf('?') + 1);
+            for (String param : queryString.split("&")) {
+                String[] pair = param.split("=", 2);
+                if (pair.length == 2) {
+                    String key = pair[0].trim();
+                    if ("business_name".equalsIgnoreCase(key) || "vxml_file".equalsIgnoreCase(key) || "vxml".equalsIgnoreCase(key)) {
+                        String val = pair[1].trim();
+                        if (!val.isEmpty()) {
+                            System.out.println("[VxmlAgiHandler] Using URL query parameter " + key + ": " + val);
+                            return sanitizeVxmlName(val);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 4. Extract path component from request URL
         if (requestPath != null) {
-            // Extract path after last slash
-            int lastSlash = requestPath.lastIndexOf('/');
-            if (lastSlash >= 0 && lastSlash < requestPath.length() - 1) {
-                String pathVxml = requestPath.substring(lastSlash + 1).trim();
-                if (!pathVxml.isEmpty()) {
+            String pathOnly = requestPath.contains("?") ? requestPath.substring(0, requestPath.indexOf('?')) : requestPath;
+            int lastSlash = pathOnly.lastIndexOf('/');
+            if (lastSlash >= 0 && lastSlash < pathOnly.length() - 1) {
+                String pathVxml = pathOnly.substring(lastSlash + 1).trim();
+                if (!pathVxml.isEmpty() && !pathVxml.equalsIgnoreCase("default") && !pathVxml.equalsIgnoreCase("ivr_platform")) {
                     System.out.println("[VxmlAgiHandler] Using path-derived VXML: " + pathVxml);
                     return sanitizeVxmlName(pathVxml);
                 }
             }
         }
 
-        // Check request path from AGI
-        String script = request.getScript(); // May also contain path info
-        if (script != null && !script.isEmpty()) {
-            System.out.println("[VxmlAgiHandler] Using script path: " + script);
-            return sanitizeVxmlName(script);
+        // 5. Check script path
+        String script = request.getScript();
+        if (script != null && !script.trim().isEmpty() && !script.equalsIgnoreCase("default") && !script.equalsIgnoreCase("ivr_platform")) {
+            String cleanScript = script.contains("?") ? script.substring(0, script.indexOf('?')) : script;
+            System.out.println("[VxmlAgiHandler] Using script path: " + cleanScript);
+            return sanitizeVxmlName(cleanScript);
         }
 
         // Default fallback
@@ -223,12 +263,21 @@ public class VxmlAgiHandler extends BaseAgiScript {
     /**
      * Restricts a VXML scenario name to a safe identifier so callers cannot
      * traverse out of the scenarios directory (e.g. "../../etc/passwd").
+     * Strips .vxml and .json extensions if present.
      */
     private String sanitizeVxmlName(String name) {
         if (name == null) {
             return "hello";
         }
         String trimmed = name.trim();
+        if (trimmed.contains("?")) {
+            trimmed = trimmed.substring(0, trimmed.indexOf('?'));
+        }
+        if (trimmed.toLowerCase().endsWith(".vxml")) {
+            trimmed = trimmed.substring(0, trimmed.length() - 5);
+        } else if (trimmed.toLowerCase().endsWith(".json")) {
+            trimmed = trimmed.substring(0, trimmed.length() - 5);
+        }
         if (trimmed.isEmpty() || trimmed.contains("/") || trimmed.contains("\\") || trimmed.contains("..")) {
             return "hello";
         }

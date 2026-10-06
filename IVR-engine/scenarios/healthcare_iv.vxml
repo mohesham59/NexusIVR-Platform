@@ -1,32 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <vxml version="2.1" xmlns="http://www.w3.org/2001/vxml">
-  <meta name="flow-name" content="Frontend Flow"/>
+  <meta name="flow-name" content="Telecom IVR"/>
   <!-- Start (n1) -->
   <form id="n1">
     <block>
       <prompt bargein="false" xml:lang="en">
-        Welcome to XYZ Hospital. For appointments, pharmacy, billing, or triage, press the corresponding number. To speak with a nurse, press 0.
-      </prompt>
-      <prompt bargein="false" xml:lang="ar">
-        مرحبًا بكم في مستشفى XYZ. للموعد، الصيدلية، الفواتير أو التقييم، اضغط الرقم المقابل. للتحدث مع الممرضة، اضغط 0.
+        Welcome to Telecom Services. Press 1 for Billing. Press 2 for Roaming. Press 3 for Sim Support. Press 4 for Broadband. Press 0 to speak to an agent.
       </prompt>
       <goto next="#n2"/>
     </block>
   </form>
-  <!-- Lang menu (n2) -->
+  <!-- Menu (n2) -->
   <menu id="n2">
       <prompt bargein="true" xml:lang="en">
-        For English press 1. For Arabic press 2.
-      </prompt>
-      <prompt bargein="true" xml:lang="ar">
-        للإنجليزية اضغط 1. للعربية اضغط 2.
+        Please select an option.
       </prompt>
       <choice dtmf="1" next="#n3"/>
       <choice dtmf="2" next="#n4"/>
+      <choice dtmf="3" next="#n5"/>
+      <choice dtmf="4" next="#n6"/>
+      <choice dtmf="0" next="#n7"/>
+      <choice dtmf="6" next="#n8">End Call</choice>
+      <choice dtmf="5" next="#n8"/>
       <noinput>
         <prompt xml:lang="en">We did not receive any input. Please try again.</prompt>
         <prompt xml:lang="ar">لم نتلق أي إدخال. يرجى المحاولة مرة أخرى.</prompt>
-        <reprompt/>
+        <goto next="#n8"/>
       </noinput>
       <nomatch>
         <prompt xml:lang="en">Invalid option. Please try again.</prompt>
@@ -34,168 +33,60 @@
         <reprompt/>
       </nomatch>
   </menu>
-  <!-- Lang en (n3) -->
+  <!-- Billing (n3) -->
   <form id="n3">
     <block>
-      <assign name="language" expr="'en'"/>
-      <goto next="#n5"/>
-    </block>
-  </form>
-  <!-- Lang ar (n4) -->
-  <form id="n4">
-    <block>
-      <assign name="language" expr="'ar'"/>
-      <goto next="#n5"/>
-    </block>
-  </form>
-  <!-- Business check (n5) -->
-  <form id="n5">
-    <block>
       <prompt bargein="false" xml:lang="en">
-        Our business hours are Monday through Friday, 8 AM to 6 PM. For emergency services, 24/7.
+        Please hold while we connect you to Billing.
       </prompt>
-      <prompt bargein="false" xml:lang="ar">
-        ساعات عملنا هي من الإثنين إلى الجمعة من 8 صباحًا حتى 6 مساءً. لخدمات الطوارئ، 24/7.
-      </prompt>
-      <goto next="#n6"/>
-    </block>
-  </form>
-  <!-- Main menu (n6) -->
-  <menu id="n6">
-      <prompt bargein="true" xml:lang="en">
-        Please select an option: Press 1 for Appointments, Press 2 for Pharmacy, Press 3 for Billing, Press 4 for Triage, Press 0 for Nurse Line.
-      </prompt>
-      <prompt bargein="true" xml:lang="ar">
-        يرجى اختيار خيار: اضغط 1 للمواعيد، اضغط 2 للصيدلية، اضغط 3 للفواتير، اضغط 4 للتقييم، اضغط 0 للخط الطبي.
-      </prompt>
-      <choice dtmf="1" next="#n14"/>
-      <choice dtmf="2" next="#n10"/>
-      <choice dtmf="3" next="#n11"/>
-      <choice dtmf="4" next="#n12"/>
-      <choice dtmf="0" next="#n13"/>
-      <noinput>
-        <prompt xml:lang="en">We did not receive any input. Please try again.</prompt>
-        <prompt xml:lang="ar">لم نتلق أي إدخال. يرجى المحاولة مرة أخرى.</prompt>
-        <reprompt/>
-      </noinput>
-      <nomatch>
-        <prompt xml:lang="en">Invalid option. Please try again.</prompt>
-        <prompt xml:lang="ar">خيار غير صالح. يرجى المحاولة مرة أخرى.</prompt>
-        <reprompt/>
-      </nomatch>
-  </menu>
-  <!-- Appointments date (n7) -->
-  <form id="n7">
-    <block>
-      <assign name="app_date" expr="'$date'"/>
+      <transfer dest="Transfer the call to an agent or number"/>
       <goto next="#n8"/>
     </block>
   </form>
-  <!-- Appointments time (n8) -->
+  <!-- Roaming (n4) -->
+  <form id="n4">
+    <block>
+      <prompt bargein="false" xml:lang="en">
+        Please hold while we connect you to Roaming.
+      </prompt>
+      <transfer dest="Transfer the call to an agent or number"/>
+      <goto next="#n8"/>
+    </block>
+  </form>
+  <!-- Sim support (n5) -->
+  <form id="n5">
+    <block>
+      <prompt bargein="false" xml:lang="en">
+        Please hold while we connect you to Sim Support.
+      </prompt>
+      <transfer dest="Transfer the call to an agent or number"/>
+      <goto next="#n8"/>
+    </block>
+  </form>
+  <!-- Broadband (n6) -->
+  <form id="n6">
+    <block>
+      <prompt bargein="false" xml:lang="en">
+        Please hold while we connect you to Broadband.
+      </prompt>
+      <transfer dest="Transfer the call to an agent or number"/>
+      <goto next="#n8"/>
+    </block>
+  </form>
+  <!-- Agent (n7) -->
+  <form id="n7">
+    <block>
+      <prompt bargein="false" xml:lang="en">
+        Please hold while we connect you to a representative.
+      </prompt>
+      <transfer dest="Transfer the call to an agent or number"/>
+      <goto next="#n8"/>
+    </block>
+  </form>
+  <!-- End Call (n8) -->
   <form id="n8">
     <block>
-      <assign name="app_time" expr="'$time'"/>
-      <goto next="#n9"/>
-    </block>
-  </form>
-  <!-- Appointments confirm (n9) -->
-  <form id="n9">
-    <block>
-      <prompt bargein="false" xml:lang="en">
-        Your appointment is scheduled for {app_date} at {app_time}. Thank you.
-      </prompt>
-      <prompt bargein="false" xml:lang="ar">
-        تم جدولة موعدك في {app_date} الساعة {app_time}. شكرًا لك.
-      </prompt>
-      <goto next="#n16"/>
-    </block>
-  </form>
-  <!-- Pharmacy (n10) -->
-  <form id="n10">
-    <block>
-      <prompt bargein="false" xml:lang="en">
-        Connecting you to Pharmacy. Please hold.
-      </prompt>
-      <prompt bargein="false" xml:lang="ar">
-        جاري تحويلك إلى الصيدلية. يرجى الانتظار.
-      </prompt>
-      <transfer dest="Transfer the call to an agent or number"/>
-      <goto next="#n16"/>
-    </block>
-  </form>
-  <!-- Billing (n11) -->
-  <form id="n11">
-    <block>
-      <prompt bargein="false" xml:lang="en">
-        Connecting you to Billing. Please hold.
-      </prompt>
-      <prompt bargein="false" xml:lang="ar">
-        جاري تحويلك إلى الفواتير. يرجى الانتظار.
-      </prompt>
-      <transfer dest="Transfer the call to an agent or number"/>
-      <goto next="#n16"/>
-    </block>
-  </form>
-  <!-- Triage (n12) -->
-  <form id="n12">
-    <block>
-      <prompt bargein="false" xml:lang="en">
-        Connecting you to Triage. Please hold.
-      </prompt>
-      <prompt bargein="false" xml:lang="ar">
-        جاري تحويلك إلى التقييم. يرجى الانتظار.
-      </prompt>
-      <transfer dest="Transfer the call to an agent or number"/>
-      <goto next="#n16"/>
-    </block>
-  </form>
-  <!-- Nurse line (n13) -->
-  <form id="n13">
-    <block>
-      <prompt bargein="false" xml:lang="en">
-        Connecting you to the Nurse Line. Please hold.
-      </prompt>
-      <prompt bargein="false" xml:lang="ar">
-        جاري تحويلك إلى الخط الطبي. يرجى الانتظار.
-      </prompt>
-      <transfer dest="Transfer the call to an agent or number"/>
-      <goto next="#n16"/>
-    </block>
-  </form>
-  <!-- Emergency (n14) -->
-  <form id="n14">
-    <block>
-      <prompt bargein="false" xml:lang="en">
-        Connecting you to Emergency. Please hold.
-      </prompt>
-      <prompt bargein="false" xml:lang="ar">
-        جاري تحويلك إلى الطوارئ. يرجى الانتظار.
-      </prompt>
-      <transfer dest="Transfer the call to an agent or number"/>
-      <goto next="#n16"/>
-    </block>
-  </form>
-  <!-- Queue (n15) -->
-  <form id="n15">
-    <block>
-      <prompt bargein="false" xml:lang="en">
-        You have been placed in a queue. Please wait for the next available agent.
-      </prompt>
-      <prompt bargein="false" xml:lang="ar">
-        تم وضعك في قائمة الانتظار. يرجى الانتظار حتى يتوفر وكيل.
-      </prompt>
-      <goto next="#n16"/>
-    </block>
-  </form>
-  <!-- Closing (n16) -->
-  <form id="n16">
-    <block>
-      <prompt bargein="false" xml:lang="en">
-        Thank you for calling XYZ Hospital. We appreciate your call. Goodbye.
-      </prompt>
-      <prompt bargein="false" xml:lang="ar">
-        شكرًا لاتصالكم بمستشفى XYZ. نقدر اتصالكم. وداعًا.
-      </prompt>
+      <prompt bargein="false">Hang up</prompt>
       <disconnect/>
     </block>
   </form>

@@ -1,0 +1,563 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<vxml version="2.1" xmlns="http://www.w3.org/2001/vxml">
+  <meta name="flow-name" content="Hospital IVR"/>
+
+  <!-- Start Dialog (n1) -->
+  <form id="n1">
+    <block>
+      <prompt bargein="false" xml:lang="en">
+        Welcome to Nexus Hospital.
+      </prompt>
+      <goto next="#lang_menu"/>
+    </block>
+  </form>
+
+  <!-- Language Selection Menu -->
+  <menu id="lang_menu">
+    <prompt bargein="true" xml:lang="en">
+      For English, press 1.
+    </prompt>
+    <prompt bargein="true" xml:lang="ar">
+      للغة العربية، اضغط 2.
+    </prompt>
+    <choice dtmf="1" next="#set_lang_en"/>
+    <choice dtmf="2" next="#set_lang_ar"/>
+    <noinput>
+      <prompt xml:lang="en">We did not receive any input. Defaulting to English.</prompt>
+      <goto next="#set_lang_en"/>
+    </noinput>
+    <nomatch>
+      <prompt xml:lang="en">Invalid option.</prompt>
+      <prompt xml:lang="ar">خيار غير صالح.</prompt>
+      <reprompt/>
+    </nomatch>
+  </menu>
+
+  <!-- Set Language EN -->
+  <form id="set_lang_en">
+    <block>
+      <assign name="language" expr="'en'"/>
+      <goto next="#main_menu_en"/>
+    </block>
+  </form>
+
+  <!-- Set Language AR -->
+  <form id="set_lang_ar">
+    <block>
+      <assign name="language" expr="'ar'"/>
+      <goto next="#main_menu_ar"/>
+    </block>
+  </form>
+
+  <!-- English Main Menu -->
+  <menu id="main_menu_en">
+    <prompt bargein="true" xml:lang="en">
+      Nexus Hospital Main Menu. Press 1 for Appointments, 2 for Doctors, 3 for Departments, 4 for Emergency, 5 for Pharmacy, 6 for Laboratory, 7 for Radiology, 8 for Insurance, 9 for Patient Information, 0 for Operator.
+    </prompt>
+    <choice dtmf="1" next="#appointments_menu_en"/>
+    <choice dtmf="2" next="#doctors_menu_en"/>
+    <choice dtmf="3" next="#departments_menu_en"/>
+    <choice dtmf="4" next="#emergency_flow_en"/>
+    <choice dtmf="5" next="#pharmacy_menu_en"/>
+    <choice dtmf="6" next="#laboratory_menu_en"/>
+    <choice dtmf="7" next="#radiology_menu_en"/>
+    <choice dtmf="8" next="#insurance_menu_en"/>
+    <choice dtmf="9" next="#patient_info_menu_en"/>
+    <choice dtmf="0" next="#operator_flow_en"/>
+    <noinput>
+      <prompt xml:lang="en">You did not enter a selection. Please try again.</prompt>
+      <reprompt/>
+    </noinput>
+    <nomatch>
+      <prompt xml:lang="en">That option is invalid. Please try again.</prompt>
+      <reprompt/>
+    </nomatch>
+  </menu>
+
+  <!-- Arabic Main Menu -->
+  <menu id="main_menu_ar">
+    <prompt bargein="true" xml:lang="ar">
+      القائمة الرئيسية لمستشفى نيكسس. اضغط 1 للمواعيد، 2 للأطباء، 3 للأقسام، 4 للطوارئ، 5 للصيدلية، 6 للمعمل، 7 للأشعة، 8 للتأمين، 9 لمعلومات المريض، 0 للتحدث مع الموظف.
+    </prompt>
+    <choice dtmf="1" next="#appointments_menu_ar"/>
+    <choice dtmf="2" next="#doctors_menu_ar"/>
+    <choice dtmf="3" next="#departments_menu_ar"/>
+    <choice dtmf="4" next="#emergency_flow_ar"/>
+    <choice dtmf="5" next="#pharmacy_menu_ar"/>
+    <choice dtmf="6" next="#laboratory_menu_ar"/>
+    <choice dtmf="7" next="#radiology_menu_ar"/>
+    <choice dtmf="8" next="#insurance_menu_ar"/>
+    <choice dtmf="9" next="#patient_info_menu_ar"/>
+    <choice dtmf="0" next="#operator_flow_ar"/>
+    <noinput>
+      <prompt xml:lang="ar">لم يتم إدخال أي خيار. يرجى المحاولة مرة أخرى.</prompt>
+      <reprompt/>
+    </noinput>
+    <nomatch>
+      <prompt xml:lang="ar">خيار غير صالح. يرجى المحاولة مرة أخرى.</prompt>
+      <reprompt/>
+    </nomatch>
+  </menu>
+
+  <!-- Appointments Menu EN -->
+  <menu id="appointments_menu_en">
+    <prompt bargein="true" xml:lang="en">
+      Appointments Department. Press 1 to book an appointment, 2 to change an appointment, 3 to cancel an appointment, 4 to check an appointment, 5 to return to main menu.
+    </prompt>
+    <choice dtmf="1" next="#patient_id_form_en"/>
+    <choice dtmf="2" next="#patient_id_form_en"/>
+    <choice dtmf="3" next="#patient_id_form_en"/>
+    <choice dtmf="4" next="#patient_id_form_en"/>
+    <choice dtmf="5" next="#main_menu_en"/>
+    <noinput>
+      <prompt xml:lang="en">No selection received.</prompt>
+      <reprompt/>
+    </noinput>
+    <nomatch>
+      <prompt xml:lang="en">Invalid choice.</prompt>
+      <reprompt/>
+    </nomatch>
+  </menu>
+
+  <!-- Appointments Menu AR -->
+  <menu id="appointments_menu_ar">
+    <prompt bargein="true" xml:lang="ar">
+      قسم المواعيد. اضغط 1 لحجز موعد، 2 لتغيير موعد، 3 لإلغاء موعد، 4 للاستعلام عن موعد، 5 للعودة للقائمة الرئيسية.
+    </prompt>
+    <choice dtmf="1" next="#patient_id_form_ar"/>
+    <choice dtmf="2" next="#patient_id_form_ar"/>
+    <choice dtmf="3" next="#patient_id_form_ar"/>
+    <choice dtmf="4" next="#patient_id_form_ar"/>
+    <choice dtmf="5" next="#main_menu_ar"/>
+    <noinput>
+      <prompt xml:lang="ar">لم نتلق أي إدخال.</prompt>
+      <reprompt/>
+    </noinput>
+    <nomatch>
+      <prompt xml:lang="ar">خيار غير صالح.</prompt>
+      <reprompt/>
+    </nomatch>
+  </menu>
+
+  <!-- Patient ID Form EN -->
+  <form id="patient_id_form_en">
+    <field name="patient_id" type="digits" maxlen="6">
+      <prompt xml:lang="en">Please enter your patient ID followed by the pound key.</prompt>
+      <filled>
+        <prompt xml:lang="en">Thank you. Your request for patient ID has been processed.</prompt>
+        <goto next="#main_menu_en"/>
+      </filled>
+    </field>
+  </form>
+
+  <!-- Patient ID Form AR -->
+  <form id="patient_id_form_ar">
+    <field name="patient_id" type="digits" maxlen="6">
+      <prompt xml:lang="ar">من فضلك أدخل رقم المريض ثم اضغط علامة الشباك.</prompt>
+      <filled>
+        <prompt xml:lang="ar">شكرًا لك. تم تسجيل طلبك لرقم المريض بنجاح.</prompt>
+        <goto next="#main_menu_ar"/>
+      </filled>
+    </field>
+  </form>
+
+  <!-- Doctors Menu EN -->
+  <menu id="doctors_menu_en">
+    <prompt bargein="true" xml:lang="en">
+      Doctors Directory. Press 1 for Cardiology, 2 for Pediatrics, 3 for Internal Medicine, 4 for Neurology, 5 for Orthopedics, 6 for Dermatology, 7 to return to main menu.
+    </prompt>
+    <choice dtmf="1" next="#doc_info_en"/>
+    <choice dtmf="2" next="#doc_info_en"/>
+    <choice dtmf="3" next="#doc_info_en"/>
+    <choice dtmf="4" next="#doc_info_en"/>
+    <choice dtmf="5" next="#doc_info_en"/>
+    <choice dtmf="6" next="#doc_info_en"/>
+    <choice dtmf="7" next="#main_menu_en"/>
+    <noinput><reprompt/></noinput>
+    <nomatch><reprompt/></nomatch>
+  </menu>
+
+  <!-- Doctors Menu AR -->
+  <menu id="doctors_menu_ar">
+    <prompt bargein="true" xml:lang="ar">
+      دليل الأطباء. اضغط 1 للقلب، 2 للأطفال، 3 للباطنة، 4 للمخ والأعصاب، 5 للعظام، 6 للجلدية، 7 للعودة للقائمة الرئيسية.
+    </prompt>
+    <choice dtmf="1" next="#doc_info_ar"/>
+    <choice dtmf="2" next="#doc_info_ar"/>
+    <choice dtmf="3" next="#doc_info_ar"/>
+    <choice dtmf="4" next="#doc_info_ar"/>
+    <choice dtmf="5" next="#doc_info_ar"/>
+    <choice dtmf="6" next="#doc_info_ar"/>
+    <choice dtmf="7" next="#main_menu_ar"/>
+    <noinput><reprompt/></noinput>
+    <nomatch><reprompt/></nomatch>
+  </menu>
+
+  <form id="doc_info_en">
+    <block>
+      <prompt xml:lang="en">Our doctors are available Sunday through Thursday from 9 AM to 5 PM.</prompt>
+      <goto next="#main_menu_en"/>
+    </block>
+  </form>
+
+  <form id="doc_info_ar">
+    <block>
+      <prompt xml:lang="ar">عيادات الأطباء متاحة من الأحد إلى الخميس من الساعة 9 صباحًا حتى 5 مساءً.</prompt>
+      <goto next="#main_menu_ar"/>
+    </block>
+  </form>
+
+  <!-- Departments Menu EN -->
+  <menu id="departments_menu_en">
+    <prompt bargein="true" xml:lang="en">
+      Departments. Press 1 for Emergency, 2 for Cardiology, 3 for Pediatrics, 4 for Internal Medicine, 5 for Radiology, 6 for Laboratory, 7 for Pharmacy, 8 to return.
+    </prompt>
+    <choice dtmf="1" next="#emergency_flow_en"/>
+    <choice dtmf="2" next="#doc_info_en"/>
+    <choice dtmf="3" next="#doc_info_en"/>
+    <choice dtmf="4" next="#doc_info_en"/>
+    <choice dtmf="5" next="#radiology_menu_en"/>
+    <choice dtmf="6" next="#laboratory_menu_en"/>
+    <choice dtmf="7" next="#pharmacy_menu_en"/>
+    <choice dtmf="8" next="#main_menu_en"/>
+    <noinput><reprompt/></noinput>
+    <nomatch><reprompt/></nomatch>
+  </menu>
+
+  <!-- Departments Menu AR -->
+  <menu id="departments_menu_ar">
+    <prompt bargein="true" xml:lang="ar">
+      الأقسام. اضغط 1 للطوارئ، 2 للقلب، 3 للأطفال، 4 للباطنة، 5 للأشعة، 6 للمعمل، 7 للصيدلية، 8 للعودة.
+    </prompt>
+    <choice dtmf="1" next="#emergency_flow_ar"/>
+    <choice dtmf="2" next="#doc_info_ar"/>
+    <choice dtmf="3" next="#doc_info_ar"/>
+    <choice dtmf="4" next="#doc_info_ar"/>
+    <choice dtmf="5" next="#radiology_menu_ar"/>
+    <choice dtmf="6" next="#laboratory_menu_ar"/>
+    <choice dtmf="7" next="#pharmacy_menu_ar"/>
+    <choice dtmf="8" next="#main_menu_ar"/>
+    <noinput><reprompt/></noinput>
+    <nomatch><reprompt/></nomatch>
+  </menu>
+
+  <!-- Emergency Flow EN -->
+  <form id="emergency_flow_en">
+    <block>
+      <prompt xml:lang="en">For medical emergencies, please call the emergency department immediately or stay on the line for an operator.</prompt>
+      <transfer dest="1000"/>
+      <goto next="#end_call_en"/>
+    </block>
+  </form>
+
+  <!-- Emergency Flow AR -->
+  <form id="emergency_flow_ar">
+    <block>
+      <prompt xml:lang="ar">في حالات الطوارئ الطبية، يرجى التواصل مع قسم الطوارئ فورًا أو الانتظار للتحدث مع أحد الموظفين.</prompt>
+      <transfer dest="1000"/>
+      <goto next="#end_call_ar"/>
+    </block>
+  </form>
+
+  <!-- Pharmacy Menu EN -->
+  <menu id="pharmacy_menu_en">
+    <prompt bargein="true" xml:lang="en">
+      Pharmacy. Press 1 for working hours, 2 for prescription information, 3 to speak to a pharmacist, 4 to return to main menu.
+    </prompt>
+    <choice dtmf="1" next="#pharmacy_hours_en"/>
+    <choice dtmf="2" next="#pharmacy_rx_en"/>
+    <choice dtmf="3" next="#operator_flow_en"/>
+    <choice dtmf="4" next="#main_menu_en"/>
+    <noinput><reprompt/></noinput>
+    <nomatch><reprompt/></nomatch>
+  </menu>
+
+  <!-- Pharmacy Menu AR -->
+  <menu id="pharmacy_menu_ar">
+    <prompt bargein="true" xml:lang="ar">
+      الصيدلية. اضغط 1 لمواعيد العمل، 2 لمعلومات الروشتة، 3 للتحدث مع الصيدلي، 4 للعودة للقائمة الرئيسية.
+    </prompt>
+    <choice dtmf="1" next="#pharmacy_hours_ar"/>
+    <choice dtmf="2" next="#pharmacy_rx_ar"/>
+    <choice dtmf="3" next="#operator_flow_ar"/>
+    <choice dtmf="4" next="#main_menu_ar"/>
+    <noinput><reprompt/></noinput>
+    <nomatch><reprompt/></nomatch>
+  </menu>
+
+  <form id="pharmacy_hours_en">
+    <block>
+      <prompt xml:lang="en">Our hospital pharmacy is open 24 hours a day, 7 days a week.</prompt>
+      <goto next="#pharmacy_menu_en"/>
+    </block>
+  </form>
+
+  <form id="pharmacy_hours_ar">
+    <block>
+      <prompt xml:lang="ar">صيدلية المستشفى تعمل على مدار 24 ساعة يوميًا طوال أيام الأسبوع.</prompt>
+      <goto next="#pharmacy_menu_ar"/>
+    </block>
+  </form>
+
+  <form id="pharmacy_rx_en">
+    <block>
+      <prompt xml:lang="en">To refill a prescription, please present your patient ID at counter 1 in the pharmacy lobby.</prompt>
+      <goto next="#pharmacy_menu_en"/>
+    </block>
+  </form>
+
+  <form id="pharmacy_rx_ar">
+    <block>
+      <prompt xml:lang="ar">إعادة صرف الدواء تتطلب تقديم رقم المريض في شباك رقم 1 بالصيدلية.</prompt>
+      <goto next="#pharmacy_menu_ar"/>
+    </block>
+  </form>
+
+  <!-- Laboratory Menu EN -->
+  <menu id="laboratory_menu_en">
+    <prompt bargein="true" xml:lang="en">
+      Laboratory. Press 1 for hours, 2 for test preparation info, 3 for results information, 4 to return.
+    </prompt>
+    <choice dtmf="1" next="#lab_hours_en"/>
+    <choice dtmf="2" next="#lab_prep_en"/>
+    <choice dtmf="3" next="#lab_results_en"/>
+    <choice dtmf="4" next="#main_menu_en"/>
+    <noinput><reprompt/></noinput>
+    <nomatch><reprompt/></nomatch>
+  </menu>
+
+  <!-- Laboratory Menu AR -->
+  <menu id="laboratory_menu_ar">
+    <prompt bargein="true" xml:lang="ar">
+      المعمل. اضغط 1 لمواعيد العمل، 2 لتعلية التحاليل والتجهيزات، 3 لنتائج التحاليل، 4 للعودة.
+    </prompt>
+    <choice dtmf="1" next="#lab_hours_ar"/>
+    <choice dtmf="2" next="#lab_prep_ar"/>
+    <choice dtmf="3" next="#lab_results_ar"/>
+    <choice dtmf="4" next="#main_menu_ar"/>
+    <noinput><reprompt/></noinput>
+    <nomatch><reprompt/></nomatch>
+  </menu>
+
+  <form id="lab_hours_en">
+    <block>
+      <prompt xml:lang="en">The main laboratory is open daily from 7 AM to 10 PM.</prompt>
+      <goto next="#laboratory_menu_en"/>
+    </block>
+  </form>
+
+  <form id="lab_hours_ar">
+    <block>
+      <prompt xml:lang="ar">المعمل الرئيسي مفتوح يوميًا من الساعة 7 صباحًا حتى 10 مساءً.</prompt>
+      <goto next="#laboratory_menu_ar"/>
+    </block>
+  </form>
+
+  <form id="lab_prep_en">
+    <block>
+      <prompt xml:lang="en">Fasting blood tests require 8 to 12 hours of fasting prior to sample collection.</prompt>
+      <goto next="#laboratory_menu_en"/>
+    </block>
+  </form>
+
+  <form id="lab_prep_ar">
+    <block>
+      <prompt xml:lang="ar">فحوصات الدم التي تتطلب صيامًا تحتاج من 8 إلى 12 ساعة صيام قبل سحب العينة.</prompt>
+      <goto next="#laboratory_menu_ar"/>
+    </block>
+  </form>
+
+  <form id="lab_results_en">
+    <block>
+      <prompt xml:lang="en">Test results are published to the patient portal within 24 hours.</prompt>
+      <goto next="#laboratory_menu_en"/>
+    </block>
+  </form>
+
+  <form id="lab_results_ar">
+    <block>
+      <prompt xml:lang="ar">نتائج التحاليل تظهر عبر بوابة المريض الإلكترونية خلال 24 ساعة.</prompt>
+      <goto next="#laboratory_menu_ar"/>
+    </block>
+  </form>
+
+  <!-- Radiology Menu EN -->
+  <menu id="radiology_menu_en">
+    <prompt bargein="true" xml:lang="en">
+      Radiology Department. Press 1 for appointments, 2 for preparation instructions, 3 for scan results, 4 to return.
+    </prompt>
+    <choice dtmf="1" next="#patient_id_form_en"/>
+    <choice dtmf="2" next="#rad_prep_en"/>
+    <choice dtmf="3" next="#rad_results_en"/>
+    <choice dtmf="4" next="#main_menu_en"/>
+    <noinput><reprompt/></noinput>
+    <nomatch><reprompt/></nomatch>
+  </menu>
+
+  <!-- Radiology Menu AR -->
+  <menu id="radiology_menu_ar">
+    <prompt bargein="true" xml:lang="ar">
+      قسم الأشعة. اضغط 1 للمواعيد، 2 للتعليمات والتجهيزات، 3 لنتائج الأشعة، 4 للعودة.
+    </prompt>
+    <choice dtmf="1" next="#patient_id_form_ar"/>
+    <choice dtmf="2" next="#rad_prep_ar"/>
+    <choice dtmf="3" next="#rad_results_ar"/>
+    <choice dtmf="4" next="#main_menu_ar"/>
+    <noinput><reprompt/></noinput>
+    <nomatch><reprompt/></nomatch>
+  </menu>
+
+  <form id="rad_prep_en">
+    <block>
+      <prompt xml:lang="en">Please arrive 15 minutes before your scheduled scan time and bring your medical referral.</prompt>
+      <goto next="#radiology_menu_en"/>
+    </block>
+  </form>
+
+  <form id="rad_prep_ar">
+    <block>
+      <prompt xml:lang="ar">يرجى الحضور قبل 15 دقيقة من موعد الأشعة وإحضار التحويل الطبي.</prompt>
+      <goto next="#radiology_menu_ar"/>
+    </block>
+  </form>
+
+  <form id="rad_results_en">
+    <block>
+      <prompt xml:lang="en">Radiology reports are delivered to your treating doctor within 48 hours.</prompt>
+      <goto next="#radiology_menu_en"/>
+    </block>
+  </form>
+
+  <form id="rad_results_ar">
+    <block>
+      <prompt xml:lang="ar">تقارير الأشعة ترسل إلى طبيبك المعالج خلال 48 ساعة.</prompt>
+      <goto next="#radiology_menu_ar"/>
+    </block>
+  </form>
+
+  <!-- Insurance Menu EN -->
+  <menu id="insurance_menu_en">
+    <prompt bargein="true" xml:lang="en">
+      Insurance Department. Press 1 for accepted providers, 2 for authorization info, 3 to speak to insurance desk, 4 to return.
+    </prompt>
+    <choice dtmf="1" next="#ins_providers_en"/>
+    <choice dtmf="2" next="#ins_auth_en"/>
+    <choice dtmf="3" next="#operator_flow_en"/>
+    <choice dtmf="4" next="#main_menu_en"/>
+    <noinput><reprompt/></noinput>
+    <nomatch><reprompt/></nomatch>
+  </menu>
+
+  <!-- Insurance Menu AR -->
+  <menu id="insurance_menu_ar">
+    <prompt bargein="true" xml:lang="ar">
+      قسم التأمين. اضغط 1 لشركات التأمين المقبولة، 2 للموافقات، 3 للتحدث مع موظف التأمين، 4 للعودة.
+    </prompt>
+    <choice dtmf="1" next="#ins_providers_ar"/>
+    <choice dtmf="2" next="#ins_auth_ar"/>
+    <choice dtmf="3" next="#operator_flow_ar"/>
+    <choice dtmf="4" next="#main_menu_ar"/>
+    <noinput><reprompt/></noinput>
+    <nomatch><reprompt/></nomatch>
+  </menu>
+
+  <form id="ins_providers_en">
+    <block>
+      <prompt xml:lang="en">We accept major national insurance cards and corporate healthcare plans.</prompt>
+      <goto next="#insurance_menu_en"/>
+    </block>
+  </form>
+
+  <form id="ins_providers_ar">
+    <block>
+      <prompt xml:lang="ar">نقبل معظم بطاقات التأمين الوطنية والشركات المعتمدة.</prompt>
+      <goto next="#insurance_menu_ar"/>
+    </block>
+  </form>
+
+  <form id="ins_auth_en">
+    <block>
+      <prompt xml:lang="en">Prior insurance authorizations are processed within 24 to 48 hours.</prompt>
+      <goto next="#insurance_menu_en"/>
+    </block>
+  </form>
+
+  <form id="ins_auth_ar">
+    <block>
+      <prompt xml:lang="ar">الموافقات المسبقة للتأمين تستغرق من 24 إلى 48 ساعة.</prompt>
+      <goto next="#insurance_menu_ar"/>
+    </block>
+  </form>
+
+  <!-- Patient Info Menu EN -->
+  <menu id="patient_info_menu_en">
+    <prompt bargein="true" xml:lang="en">
+      Patient Information. Press 1 for appointment status, 2 for medical records, 3 to return to main menu.
+    </prompt>
+    <choice dtmf="1" next="#patient_id_form_en"/>
+    <choice dtmf="2" next="#records_info_en"/>
+    <choice dtmf="3" next="#main_menu_en"/>
+    <noinput><reprompt/></noinput>
+    <nomatch><reprompt/></nomatch>
+  </menu>
+
+  <!-- Patient Info Menu AR -->
+  <menu id="patient_info_menu_ar">
+    <prompt bargein="true" xml:lang="ar">
+      معلومات المريض. اضغط 1 لحالة الموعد، 2 للسجلات الطبية، 3 للعودة للقائمة الرئيسية.
+    </prompt>
+    <choice dtmf="1" next="#patient_id_form_ar"/>
+    <choice dtmf="2" next="#records_info_ar"/>
+    <choice dtmf="3" next="#main_menu_ar"/>
+    <noinput><reprompt/></noinput>
+    <nomatch><reprompt/></nomatch>
+  </menu>
+
+  <form id="records_info_en">
+    <block>
+      <prompt xml:lang="en">To obtain copies of medical records, please present valid identification at administrative window 3.</prompt>
+      <goto next="#patient_info_menu_en"/>
+    </block>
+  </form>
+
+  <form id="records_info_ar">
+    <block>
+      <prompt xml:lang="ar">للحصول على نسخة من السجل الطبي يرجى تقديم إثبات الشخصية في شباك الإدارة رقم 3.</prompt>
+      <goto next="#patient_info_menu_ar"/>
+    </block>
+  </form>
+
+  <!-- Operator Flow EN -->
+  <form id="operator_flow_en">
+    <block>
+      <prompt xml:lang="en">Connecting you to an operator. Please hold.</prompt>
+      <transfer dest="1000"/>
+      <goto next="#end_call_en"/>
+    </block>
+  </form>
+
+  <!-- Operator Flow AR -->
+  <form id="operator_flow_ar">
+    <block>
+      <prompt xml:lang="ar">جاري تحويلك إلى خدمة العملاء. يرجى الانتظار.</prompt>
+      <transfer dest="1000"/>
+      <goto next="#end_call_ar"/>
+    </block>
+  </form>
+
+  <!-- End Call EN -->
+  <form id="end_call_en">
+    <block>
+      <prompt xml:lang="en">Thank you for calling Nexus Hospital. Goodbye.</prompt>
+      <disconnect/>
+    </block>
+  </form>
+
+  <!-- End Call AR -->
+  <form id="end_call_ar">
+    <block>
+      <prompt xml:lang="ar">شكرًا لاتصالكم بمستشفى نيكسس. مع السلامة.</prompt>
+      <disconnect/>
+    </block>
+  </form>
+</vxml>

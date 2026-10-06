@@ -91,6 +91,24 @@ public class VxmlAgiCompatibilityTest extends TestCase {
     }
 
     /**
+     * Test that hospital_ivr scenario can be loaded directly and via alias mappings by VxmlLoader.
+     */
+    public void testHospitalIvrLoadingAndAliases() throws Exception {
+        VxmlLoader loader = new VxmlLoader("scenarios/");
+        Document docDirect = loader.loadVxml("hospital_ivr");
+        assertNotNull("hospital_ivr.vxml should be loaded directly", docDirect);
+
+        Document docWithExt = loader.loadVxml("hospital_ivr.vxml");
+        assertNotNull("hospital_ivr.vxml should be loaded when name includes extension", docWithExt);
+
+        Document docAlias = loader.loadVxml("hospital");
+        assertNotNull("hospital_ivr should be loaded via alias 'hospital'", docAlias);
+
+        Document docPizzaAlias = loader.loadVxml("pizza_palace");
+        assertNotNull("pizza_iv should be loaded via alias 'pizza_palace'", docPizzaAlias);
+    }
+
+    /**
      * Test that voicemail node does NOT use <record> tag (AGI doesn't support it).
      * After the webapp fix, voicemail should use <block><prompt><goto/> instead.
      */

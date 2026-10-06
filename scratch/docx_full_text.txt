@@ -1,0 +1,419 @@
+
+
+
+NexusIVR
+Comprehensive Technical Reference
+
+Multi-Tenant AI-Powered IVR & Contact Center SaaS Platform
+
+
+Table of Contents
+1. Executive Summary & Platform Vision
+2. User Roles & Access Model
+3. End-to-End Business Logic Walkthrough (Restaurant Case Study)
+4. High-Level System Architecture
+   4.1 Control Plane vs. Data Plane Separation
+   4.2 Inter-Service Communication Matrix
+   4.3 Container Topology & Docker Architecture
+5. Repository & Module Breakdown
+6. The 7-Pass AI Generation Pipeline (Deep Technical Walkthrough)
+   6.1 Pass 1: Domain Detection & Prompt Refinement
+   6.2 Pass 2: Specification Expansion
+   6.3 Pass 3: VoiceXML Synthesis via LLM
+   6.4 Pass 4: Response Normalization & JSON Extraction
+   6.5 Pass 5: Structural Validation
+   6.6 Pass 6: Auto-Repair Engine
+   6.7 Pass 7: Final Export & FlowModel Serialization
+   6.8 Industry Scenario Diagrams
+7. AI Provider Management & Circuit Breaker Resiliency
+   7.1 Provider Priority Chain & Fallback Logic
+   7.2 Circuit Breaker State Machine
+   7.3 Retry Policy & Exponential Backoff
+   7.4 Cost Optimization & Quota Routing
+8. IVR-AI-Engine Backend Specification
+   8.1 Controller / Servlet Layer
+   8.2 Service Layer Business Logic
+   8.3 Data Access Layer & Tenant Isolation
+   8.4 Security: JWT Authentication & Password Hashing
+9. FastAGI Telephony Engine (IVR-Engine)
+   9.1 Live Call Execution Sequence Diagram
+   9.2 VoiceXML DOM Interpreter
+   9.3 Text-to-Speech Engine & Audio Pipeline
+   9.4 Asterisk Dialplan Auto-Provisioning
+10. Payment Service & Subscription Management
+   10.1 Paymob Gateway Integration (3-Step Handshake)
+   10.2 HMAC Signature Verification
+   10.3 Subscription Lifecycle & Auto-Expiration
+11. Database Architecture & Schema Reference
+   11.1 Entity-Relationship Diagram
+   11.2 Complete Table Specifications (21 Tables)
+   11.3 Vector Search & RAG Pipeline
+12. Multi-Tenant Isolation & Security Model
+   12.1 Three-Layer Defense-in-Depth Architecture
+   12.2 DAO-Level Enforcement Patterns
+13. IVR-Webapp Frontend Specification
+   13.1 Tenant Admin Screens
+   13.2 Super Admin Screens
+   13.3 Visual IVR Builder Engine
+14. Complete REST API Endpoint Reference
+15. Infrastructure, Docker & Environment Configuration
+16. Known Limitations, Technical Debts & Clarification Items
+17. Feature Matrix & AI Roadmap
+18. Glossary of Key Terms
+
+1. Executive Summary & Platform Vision
+NexusIVR is an enterprise-grade, multi-tenant Software-as-a-Service (SaaS) platform that enables businesses to design, deploy, and manage AI-powered Interactive Voice Response (IVR) systems without writing a single line of code. The platform combines a visual drag-and-drop flow builder with a sophisticated 7-pass generative AI pipeline that can transform a single natural-language sentence — such as "I need a phone system for my restaurant that takes table reservations" — into a fully functional, production-ready VoiceXML 2.1 telephony application, complete with greeting prompts, DTMF input handling, API integrations, and multilingual support.
+The core business value proposition is radical simplification: a non-technical business owner can go from a one-sentence description of their needs to a live, working, telephone-answering AI system in under five minutes, with zero manual telephony configuration. Behind the scenes, the platform silently handles domain detection, script generation, structural validation, auto-repair of detected defects, Asterisk PBX provisioning, and multi-tenant data isolation — all transparently, without the user needing to understand any of these underlying systems.
+The platform serves two distinct user personas. Platform Super Administrators manage the shared infrastructure, monitor cross-tenant health metrics, configure global AI provider settings, and administer SaaS subscriptions. Tenant Administrators — the day-to-day users — design IVR flows, manage voice prompt libraries, configure call queues and SIP extensions, review call analytics, and handle their own billing. Every piece of data and every operation is scoped to the authenticated tenant, enforced through a three-layer defense-in-depth isolation model described in detail in Section 12.
+Technology Stack
+The technology choices reflect deliberate architectural priorities: Java 21 provides the stability and thread-safety required for a telephony backend handling concurrent calls; Jakarta Servlet 6.0 on embedded Tomcat 10 keeps the deployment model simple without requiring an external application server; PostgreSQL with pgvector combines relational data integrity with high-performance vector similarity search for the RAG knowledge base; and React 19 with TypeScript delivers a responsive, type-safe frontend development experience.
+
+2. User Roles & Access Model
+Super Admin — Platform-Level Administrator
+The Super Admin is the operator of the entire NexusIVR SaaS instance. This role has unrestricted visibility across all tenant companies and their data. The Super Admin's primary responsibilities include provisioning new tenant companies, managing the global pool of AI provider API keys and credentials that all tenants share, monitoring overall platform health (database connectivity, Asterisk AMI status, JVM memory, AI provider circuit breaker states), administering SaaS subscription plans and pricing tiers through the Paymob payment integration, reviewing platform-wide audit logs for security and compliance purposes, and overriding tenant subscription plans when needed (for example, granting a trial extension or upgrading a customer's plan directly).
+Every Super Admin action that modifies another tenant's data — such as overriding a subscription plan or suspending a company account — is recorded in the audit_logs table with the Super Admin's identity, the target tenant, and a JSON payload describing the change. This creates a complete, tamper-evident trail of administrative actions.
+
+Tenant Admin — Company-Level Administrator
+The Tenant Admin is the day-to-day user of the platform and represents a single subscribing business. Their responsibilities are strictly scoped to their own company's data: authoring and editing IVR call flows using the visual Canvas builder, managing the voice prompt library (recorded or AI-generated audio assets), assigning internal SIP extensions to staff members or departments, configuring call queues and ACD routing rules (round-robin, least-recent, ring-all, or linear distribution strategies), and reviewing call analytics and CDR records limited to their own tenant's telephony traffic.
+A Tenant Admin can never view, edit, or even be aware of the existence of another tenant's flows, call history, voice prompts, or configuration. This boundary is enforced at multiple technical layers: the JWT token encodes the tenant ID, the servlet base class extracts it, every DAO query filters by it, and the database itself can enforce row-level security policies as a final safety net. This is not a convenience feature — it is the foundational security invariant of the entire system.
+
+Design implication: Because the platform is multi-tenant by default, every single database query, every API request, and every telephony session must always carry a tenant identifier context. This is not an optional feature — it is the foundational security assumption baked into the entire system from the database schema up through the REST API layer.
+
+3. End-to-End Business Logic Walkthrough (Restaurant Case Study)
+To fully understand how the pieces of NexusIVR work together, consider a concrete, realistic scenario: a restaurant owner wants an automated phone system that takes table reservations — collecting the caller's name, party size, and preferred reservation time — without hiring any developer or telephony specialist.
+Step 1: Request Initiation
+The restaurant's Tenant Admin logs into the IVR-webapp at the /login route. The LoginPage component collects their email and password, sends a POST request to /api/auth/login on the IVR-AI-engine backend, and receives back a JWT token along with a user object containing their tenant ID, role, and display name. The frontend stores the token in localStorage under the key nexusivr_token and the user object under nexusivr_user, then redirects to the /dashboard route. From this point forward, every HTTP request made by the Axios client (configured in src/api/aiApi.ts) automatically attaches an Authorization: Bearer <token> header, ensuring all backend operations are authenticated and tenant-scoped.
+The Tenant Admin navigates to the IVR Builder screen (/ivr-builder). The IVRBuilder.tsx component renders the visual Canvas — a drag-and-drop workspace powered by FlowCanvas.tsx — alongside a Node Library sidebar and an AI Assistant chat drawer. The canvas starts empty, or with a previously saved draft if one exists.
+
+Step 2: AI Generation Request
+The Tenant Admin types into the AI assistant chat drawer: "I want a flow for a restaurant that asks for the customer's name, party size, and reservation time." The AiAssistantPanel component captures this text and sends a POST request to /ai/agent on the IVR-AI-engine backend. The request payload carries the natural-language prompt, the tenant's authentication context (extracted from the JWT token), and the current session ID for conversation continuity.
+On the backend, the AiAgentServlet receives the request. Because this servlet extends BaseAiServlet, the base class automatically validates the JWT token, extracts the tenant ID from the token's claims, and makes it available via extractTenantId(request). This tenant ID will be threaded through every subsequent operation, ensuring complete data isolation.
+Step 3: 7-Pass Pipeline Execution
+The servlet delegates to UnifiedAiEngine, the master orchestrator for all AI operations. UnifiedAiEngine invokes the 7-pass generation pipeline, which is the heart of NexusIVR's AI capability. Each pass builds upon the output of the previous one, progressively transforming a vague natural-language prompt into a validated, production-ready VoiceXML application. The GenerationStepper component on the frontend displays real-time progress to the user, updating from "Pass 1: Analyzing Domain..." through "Pass 7: Finalizing..." as each pass completes.
+
+The pipeline begins with DomainDetector analyzing the prompt to identify the business domain as "hospitality/restaurant." DepartmentExtractor then identifies the relevant departments (e.g., reservations, general inquiry). PromptCompletenessChecker verifies the prompt contains sufficient detail — if the user had simply typed "restaurant," the checker would flag it as incomplete and request elaboration. PromptRefinerService then expands the short prompt into a detailed specification, adding sensible defaults: "Create a bilingual IVR flow for a restaurant that greets the caller, asks for their name using voice input, asks for party size via DTMF keypad entry, asks for preferred reservation time, confirms the details back to the caller, and offers to transfer to a live agent if needed."
+The refined specification is sent to ProviderManager, which routes the request to the highest-priority available AI provider. ProviderManager checks its internal health registry and circuit breaker states: if the primary provider (OpenRouter with gpt-oss-20b) is healthy, it receives the request; if it's in a circuit-breaker OPEN state due to recent failures, the request automatically falls through to Groq (llama-3.3-70b), then Gemini (gemini-2.0-flash), and finally Ollama (granite4.1:8b running locally) as a last resort. This cascading fallback ensures the user never sees a generation failure due to a single provider outage.
+The LLM returns a VoiceXML document. LlmResponseNormalizer cleans the raw response — stripping markdown code fences (```xml ... ```), removing any conversational preamble the model might have added, and extracting the pure XML content. The cleaned response is then parsed into the internal FlowModel Java object graph using VxmlToModelConverter.
+FlowValidationOrchestrator runs the deterministic validation-repair loop. First, ModelFlowValidator checks the FlowModel against a comprehensive set of structural rules: exactly one Start node must exist; at least one End node must exist; every node must be reachable from Start via Breadth-First Search; no orphan nodes may float disconnected; MENU nodes must have at least one choice; TRANSFER nodes must have a destination. The validator calculates a structural integrity score out of 100 — missing a start node costs 30 points, orphan nodes cost 10 points each.
+If the score is below 100, FlowModelAutoRepair attempts automatic fixes: it can add a missing Start node, connect orphan nodes to the nearest appropriate parent, add missing End nodes, and remove duplicate edges. The orchestrator then re-validates. This loop runs up to 10 iterations (the DEFAULT_MAX_ITERATIONS safety cap), with stall detection that breaks the loop early if a repair iteration fails to improve the score — preventing infinite loops on unfixable structural problems.
+Finally, ModelToVxmlExporter compiles the validated FlowModel back into a clean VoiceXML 2.1 document. ModelToFlowRenderer converts it into React Flow JSON for the frontend canvas, automatically calculating X/Y coordinates using a deterministic grid layout formula (x = 100 + (index % 5) * 200, y = 100 + (index / 5) * 150) so nodes appear in an organized, readable arrangement rather than stacking on top of each other.
+Step 4: Visual Rendering on Canvas
+The generated flow is rendered on the FlowCanvas as connected visual nodes: a Start node, a Greeting node playing a welcome message ("Thank you for calling! Press 1 for reservations, or press 2 to speak with a staff member"), a DTMF Menu node branching on the caller's keypress, Input nodes collecting the customer's name and party size, and an End node confirming the reservation. The Tenant Admin can now inspect any node by clicking it to open the PropertiesPanel on the right side, where they can edit the greeting script's wording, adjust timeout durations, change DTMF key mappings, or modify API endpoint URLs.
+
+
+Step 5: Draft Persistence
+While editing, the flow is periodically or explicitly saved as a draft. FlowDraftService writes the FlowModel as a JSON file to the IVR-engine/draft/ directory, preserving the complete graph state including node positions, properties, and edge connections. The draft is not live and has no effect on any real phone number — it exists purely as a work-in-progress snapshot that the Tenant Admin can return to later.
+Step 6: Publishing
+Once satisfied with the flow, the Tenant Admin clicks the "Publish" button. This triggers a multi-step publishing pipeline in FlowPublishService:
+First, FlowModelValidator runs one final validation pass to ensure the flow is structurally sound. If any critical issues are detected (missing Start node, unreachable nodes, or invalid MENU configurations), the publish is blocked and the user sees a detailed error list explaining what needs to be fixed.
+If validation passes, ModelToVxmlExporter serializes the FlowModel into a VoiceXML 2.1 XML string. This VXML file is written to /app/IVR-engine/scenarios/{tenant_id}_{flow_name}.vxml — note the tenant_id prefix, which ensures that different tenants' scenarios can never collide in the shared filesystem.
+FlowPublishService then executes the add_extension.sh shell script, which performs live Asterisk dialplan provisioning. The script takes an extension number and a scenario name, uses sed to idempotently remove any existing dialplan entries for that extension (making the script safe to run repeatedly), injects a new dialplan stanza into /etc/asterisk/extensions.conf, and executes asterisk -rx "dialplan reload" to hot-reload the configuration without interrupting any calls currently in progress. This script runs with passwordless sudo via a tightly scoped entry in /etc/sudoers.d/nexus_ivr — a minimal-privilege design choice that lets the application server provision new extensions automatically without expanding its overall system privileges.
+
+Step 7: Live Call Execution
+A real customer dials the restaurant's published phone number. Asterisk PBX receives the SIP INVITE, matches the dialed extension against the freshly-loaded dialplan, and routes the call via the FastAGI protocol to the IVR-engine running on TCP port 4573. The FastAgiServerMain process, which has been listening since container startup, dispatches the request to VxmlAgiHandler.
+VxmlAgiHandler answers the call channel, reads the VXML_FILE channel variable set by the dialplan, and passes the filename to VxmlLoader, which retrieves the XML document from /app/scenarios/ (with thread-safe ConcurrentHashMap caching to avoid redundant disk I/O under high call volume). VxmlValidator performs a structural check on the XML — verifying the <vxml> root element, version attribute, form IDs, and choice event handlers — before the scenario is handed to VxmlScenarioEngine for execution.
+The scenario engine walks through the VXML DOM node by node. For each <prompt> element, it invokes TtsEngine to either play a pre-generated cached audio file or synthesize new speech on the fly using gTTS (Google Text-to-Speech via Python) with ffmpeg transcoding to Asterisk-native audio formats (WAV 8kHz mono, GSM, ULAW). TtsEngine caches all generated audio using SHA-256 hashes of the text content, so identical prompts are never re-synthesized. For each <field> or <menu> element, the engine captures the caller's DTMF digits via Asterisk's getData()/getOption() AGI commands, evaluates <filled> blocks, and navigates <goto> transitions to the next form. Transfer operations execute via the Asterisk Dial() application.
+Throughout the call, AnalyticsTracker records timestamped events — CALL_START, each menu selection, each input capture, each transfer, and CALL_END — storing them as a JSON event array. On call completion (or hangup), the tracker calculates total duration and inserts a single row into the call_analytics table, capturing the complete call journey for later reporting.
+Step 8: Telemetry & Reporting
+After the call ends, the restaurant's Tenant Admin can review the interaction in the Call Analytics screen (/call-analytics). The CallAnalytics.tsx component fetches CDR records from GET /api/cdr and telephony metrics from GET /api/telephony/analytics, displaying a table of calls with status (ANSWERED, MISSED, BUSY, FAILED), duration, caller ID, and the last VXML node visited. Clicking into a specific call reveals the detailed Call Events Timeline — a visual representation of the caller's journey through the IVR, showing exactly which menus they navigated, what inputs they provided, and where they exited.
+
+
+This case study illustrates the complete business value loop: a non-technical business owner went from a one-sentence request to a live, working, telephone-answering AI system — with zero manual telephony configuration — while the platform silently handled domain detection, script generation, structural validation, auto-repair, Asterisk provisioning, and multi-tenant data isolation behind the scenes.
+
+Figure 4.1 — Restaurant Reservation: End-to-End Flow
+
+
+4. High-Level System Architecture
+NexusIVR follows a clean, layered, multi-tier architecture with a deliberate separation between the "control plane" (flow design, management, and administration) and the "data plane" (live telephony call execution). This separation is not accidental — it is a foundational architectural decision that ensures design-time changes (editing flows, modifying prompts, configuring queues) can never risk the stability of calls that are currently in progress. The two planes share a common database and filesystem, but they communicate through completely different protocols: REST/JSON for the control plane, and FastAGI for the data plane.
+4.1 Control Plane vs. Data Plane Separation
+Administrative and design-time interactions happen entirely over secure REST/JSON APIs between the React frontend (IVR-webapp) and the Java backend (IVR-AI-engine). When a Tenant Admin builds a flow, the browser communicates exclusively with IVR-AI-engine's servlet endpoints on port 8081. The AI engine handles authentication, flow generation, database persistence, and notification management — everything that happens before a phone rings.
+Live telephony traffic, by contrast, is processed over a completely separate real-time channel. When a customer actually calls in, Asterisk PBX connects directly to IVR-engine via the FastAGI protocol on port 4573. The IVR-engine loads the pre-published VXML scenario from the shared filesystem, executes it against the live Asterisk channel, and records analytics to the shared database. At no point does a live call need to touch IVR-AI-engine — the scenario was already compiled and deployed before the phone rang.
+This design means that if IVR-AI-engine goes down for maintenance or encounters an error, all previously-published IVR flows continue to work perfectly — callers experience zero disruption. Only the ability to design new flows or modify existing ones is affected during a backend outage.
+
+Figure 4.2 — System Architecture: Control Plane vs. Data Plane
+
+4.2 Inter-Service Communication Matrix
+The following matrix documents every communication path between system components, including the protocol used, the transport mechanism, and the business purpose of each connection. Understanding these paths is essential for troubleshooting, firewall configuration, and security auditing.
+4.3 Container Topology & Docker Architecture
+The platform deploys as five Docker containers orchestrated by docker-compose.yml. The Asterisk PBX and IVR-engine containers use host networking mode — this is a deliberate choice required by VoIP: SIP signaling and RTP audio streams use dynamically negotiated UDP ports in the 10000–20000 range, and Docker's NAT layer introduces unacceptable latency and port-mapping complexity for real-time audio. The remaining three containers (AI engine, payment service, webapp) use standard Docker bridge networking with explicit port mappings.
+The startup sequence is dependency-ordered: PostgreSQL must be available first (remote NeonDB cloud instance), then Asterisk starts and mounts its audio/CDR volumes, then IVR-engine starts its FastAGI listener, then the two Tomcat-based services start (payment first, AI engine second), and finally IVR-webapp starts only after both backend services pass their Docker health checks. This gated startup prevents the frontend from serving pages that would immediately fail API calls to backends that haven't finished initializing.
+
+5. Repository & Module Breakdown
+The codebase is organized into four active core modules — three application services and a database migration directory — plus shared configuration, provisioning utilities, and developer tools. Each module is a self-contained build artifact with its own Dockerfile, dependency manifest (pom.xml or package.json), and deployment configuration.
+IVR-Platform/
+├── Database/                         # SQL Migration Scripts (000-015 + payment)
+│   ├── AI-database/                  # Core schema migrations
+│   └── Payment-database/             # Payment & subscription schema
+├── IVR-AI-engine/                    # ★ Core REST API Backend
+│   └── src/main/java/com/nexusivr/ai/
+│       ├── ai/                       # LLM providers, circuit breaker, agents
+│       │   ├── optimization/         # Quota routing, token tracking, caching
+│       │   └── agents/               # Specialized AI advisor agents
+│       ├── config/                   # Servlet context, CORS, global config
+│       ├── controller/               # 33 REST API servlets
+│       ├── dao/                      # 19 JDBC data access objects
+│       ├── dto/                      # Request/response DTOs
+│       ├── model/                    # Domain entities
+│       │   └── flow/                 # FlowModel, FlowNode, FlowEdge
+│       ├── security/                 # JWT & password hashing
+│       ├── service/                  # Business logic (40+ classes)
+│       └── util/                     # XML formatting, sound utilities
+├── IVR-engine/                       # ★ FastAGI Telephony Engine
+│   └── src/main/java/gov/iti/telecom/
+│       ├── platform/                 # Custom JVoiceXML platform stubs
+│       ├── dao/                      # Call analytics DAO
+│       ├── api/                      # Demo API servers
+│       ├── FastAgiServerMain.java    # AGI server bootstrap (port 4573)
+│       ├── VxmlAgiHandler.java       # AGI request handler
+│       ├── VxmlScenarioEngine.java   # VXML state machine
+│       └── TtsEngine.java           # gTTS + ffmpeg audio synthesis
+├── IVR-payment-service/              # ★ Paymob Payment API
+│   └── src/main/java/com/nexusivr/payment/
+│       ├── config/                   # Paymob config, subscription scheduler
+│       ├── controller/               # Payment servlet, health check
+│       ├── dao/                      # Subscription & transaction DAOs
+│       └── security/                 # JWT utilities
+├── IVR-webapp/                       # ★ React Frontend SPA
+│   └── src/
+│       ├── api/                      # Axios client with JWT injection
+│       ├── components/               # Shared UI components (7)
+│       ├── hooks/                    # Custom React hooks
+│       ├── ivr/                      # Visual IVR builder engine (9 files)
+│       └── screens/                  # 20+ page screens
+├── docker-compose.yml                # 5-container orchestration
+└── tools/                            # Developer utilities
+
+6. The 7-Pass AI Generation Pipeline
+The 7-pass AI generation pipeline is the technical centerpiece of NexusIVR. It transforms a short, often vague natural-language description into a structurally validated, production-ready VoiceXML 2.1 telephony application. The pipeline is designed with a critical insight: large language models are powerful generators but unreliable engineers. They can synthesize creative, domain-appropriate dialogue flows, but they frequently produce malformed XML, create unreachable nodes, forget error handlers, or generate graphs with structural defects that would cause a live telephony system to fail silently. The 7-pass architecture addresses this by treating the LLM as a creative collaborator whose output is always validated, repaired, and normalized by deterministic Java code before it reaches production.
+The pipeline is orchestrated by UnifiedAiEngine (the master facade) which delegates to specialized service classes for each phase. The entire pipeline is cancellable via GenerationCancellationRegistry — if a user navigates away or explicitly cancels during generation, the registry sets a cancellation flag that each pass checks before proceeding, preventing wasted LLM API calls and compute resources.
+
+Figure 6.1 — The 7-Pass Unified AI Pipeline
+
+6.1 Pass 1: Domain Detection & Prompt Refinement
+The first pass serves two purposes: identifying the business domain of the user's request, and enriching their often-sparse prompt into a detailed specification that downstream passes can work with. This is crucial because users rarely provide comprehensive requirements upfront — a prompt like "make me a bank IVR" contains almost no actionable detail about menu structures, authentication flows, or error handling.
+DomainDetector analyzes the prompt text against a registry of known business domains. The currently supported domains include banking, healthcare, telecom, restaurant/hospitality, hotel, airline, education, and a generic fallback. Domain detection is not merely cosmetic — it fundamentally affects the generated flow structure. A banking IVR will include account authentication nodes and balance inquiry branches; a restaurant IVR will include reservation collection nodes; a healthcare IVR will include appointment scheduling and department routing. The domain signal is threaded through every subsequent pass as context for the LLM.
+DepartmentExtractor identifies specific functional departments mentioned or implied in the prompt. For a restaurant, this might yield "reservations" and "general inquiry." For a hospital, it might yield "appointments," "pharmacy," "emergency," and "billing." These departments inform the menu structure of the generated IVR.
+PromptCompletenessChecker evaluates whether the prompt contains sufficient detail to produce a quality flow. If the user typed only "restaurant," the checker flags this as incomplete and the system can request elaboration before consuming expensive LLM API calls. This gate saves both money (LLM tokens) and time (preventing generation of low-quality flows that would need regeneration).
+PromptRefinerService then takes the domain context, department list, and original prompt, and expands them into a structured specification. For our restaurant example, the refined specification might read: "Create a bilingual (English/Arabic) IVR flow for a restaurant. The flow should greet the caller, offer a main menu with options for table reservations and speaking with staff, collect the customer's name via voice input, collect party size via DTMF keypad entry (1-9), collect preferred reservation time, confirm the reservation details back to the caller, and offer to transfer to a live agent if needed. Include noinput and nomatch error handlers on all input nodes."
+RefinedSpecCache stores the result of Pass 1 using a SHA-256 hash of the composite key (tenantId + prompt + provider + model + domain) as the cache key, with a 2-hour TTL. This means that if the same tenant submits the same prompt again within two hours, Pass 1 completes instantly from cache, effectively halving the total generation time and eliminating one LLM API call.
+6.2 Pass 2: Specification Expansion
+Pass 2 takes the refined specification from Pass 1 and expands it further with domain-specific implementation details. The LLM is instructed to produce a structured JSON specification that includes explicit node types (greeting, menu, input, transfer, api, end), edge connections, prompt scripts in both English and Arabic, DTMF key assignments, timeout durations, and error handling strategies. This structured intermediate representation bridges the gap between the natural-language specification and the formal VoiceXML output of Pass 3.
+PromptBuilder constructs the LLM prompt for this pass, embedding strict VoiceXML 2.1 constraints directly into the system prompt. This includes explicit "WRONG vs. CORRECT" code examples that prevent common LLM hallucinations — for instance, the prompt explicitly forbids nested <form> elements (a frequent LLM mistake), mandates flat form structures, requires proper & → &amp; escaping for XML validity, and insists on a single <disconnect/> endpoint to ensure clean call termination. These embedded constraints are a hard-won engineering pattern: without them, LLMs routinely generate syntactically invalid VoiceXML that crashes the telephony engine.
+6.3 Pass 3: VoiceXML Synthesis via LLM
+Pass 3 is the most compute-intensive step — it's where an actual LLM generates the raw VoiceXML document. The expanded specification from Pass 2 is sent to ProviderManager.executeWithRetryAndFallback(), which selects the highest-priority healthy provider (see Section 7 for the full provider fallback architecture). The LLM prompt includes the full specification, domain context, and strict formatting instructions from PromptBuilder.
+If the primary provider fails (rate limit, timeout, server error), ProviderManager automatically retries with exponential backoff and then falls through to the next provider in the chain. If ALL providers fail — an extreme but handled scenario — TemplateGenerator kicks in as the ultimate fallback. TemplateGenerator is not an AI model; it's a deterministic Java class that produces pre-built, domain-specific VoiceXML templates from IvrTemplateRegistry. These templates are basic but structurally valid, ensuring the user always receives a working flow rather than an error message. The quality is lower than LLM-generated output, but the system maintains 100% availability.
+6.4 Pass 4: Response Normalization & JSON Extraction
+LLMs rarely return clean, parseable output. Pass 4 addresses this reality through LlmResponseNormalizer, which applies a series of cleaning transformations to the raw LLM response: stripping markdown code fences (```xml or ```json wrappers), removing conversational preamble ("Sure! Here's your IVR flow:"), extracting the actual XML or JSON content using regex pattern matching, and normalizing whitespace. The OllamaAgent class (used for local LLM calls) includes additional defensive logic to strip markdown code blocks that the model sometimes hallucinates around JSON payloads.
+VxmlToModelConverter then parses the cleaned VoiceXML into the internal FlowModel object graph — a Java representation consisting of FlowNode objects (each with a type, properties map, and position) and FlowEdge objects (each with source and target node IDs, and a label). This internal model is the canonical representation used by all subsequent passes; no pass after this point works directly with raw XML strings.
+6.5 Pass 5: Structural Validation
+FlowValidationOrchestrator runs the deterministic validation-repair loop. The core validator is ModelFlowValidator, which checks the FlowModel against a comprehensive set of structural rules. Unlike LLM-based validation (which would be probabilistic and unreliable), these checks are deterministic boolean assertions executed in Java — they either pass or fail, with no ambiguity.
+The validation rules include:
+Topology checks: Exactly one Start node must exist. At least one End node must exist. Terminal nodes (End, Transfer, Disconnect) must not have outgoing edges. No node may have a self-referencing edge (a node connecting to itself, which would create an infinite loop during call execution).
+Reachability checks: Using Breadth-First Search (BFS) from the Start node, the validator ensures every node in the graph is reachable. Any node not visited during BFS is flagged as an orphan — a node that exists in the graph but could never be reached during an actual call, meaning it represents wasted configuration and potentially missing connections.
+Content checks: MENU nodes must have at least one choice (a menu with zero options would leave the caller stuck in silence). TRANSFER nodes must have a destination number or queue. Input nodes should have timeout and noinput handlers to gracefully handle callers who don't respond.
+The validator calculates a structural integrity score out of 100. Each rule violation deducts points based on severity: a missing Start node costs 30 points (fatal), orphan nodes cost 10 points each (structural), missing error handlers cost 5 points each (quality). A score of 100 means the flow is production-ready; anything below triggers the auto-repair pass.
+6.6 Pass 6: Auto-Repair Engine
+FlowModelAutoRepair attempts to automatically fix structural defects detected in Pass 5. The auto-repair engine implements a set of targeted repair strategies, each addressing a specific class of defect:
+Missing Start node: If the graph has no node typed as START, the repair engine inserts one and connects it to the first node that appears to be a greeting or menu. Missing End nodes: If no END node exists, one is appended and connected to terminal branches that currently lead nowhere. Orphan nodes: Disconnected nodes are connected to the nearest appropriate parent based on node type heuristics. Duplicate edges: Redundant connections between the same source and target are pruned. Invalid self-loops: Edges where source equals target are removed.
+The repair operates within FlowValidationOrchestrator's iteration loop, which runs the cycle of validate → repair → revalidate up to 10 times (DEFAULT_MAX_ITERATIONS). Critically, the orchestrator implements stall detection: it tracks the validation score and issue count after each iteration. If a repair attempt fails to improve the score or reduce the issue count, the loop breaks early rather than spinning through all 10 iterations fruitlessly. This prevents infinite loops on fundamentally broken graphs that no automated repair can fix.
+6.7 Pass 7: Final Export & FlowModel Serialization
+Once the FlowModel passes validation (score = 100, or the best achievable score after repair), two final transformations occur simultaneously:
+ModelToVxmlExporter compiles the FlowModel into a standards-compliant VoiceXML 2.1 XML document. Each node type maps to specific VXML constructs: Menu nodes become <menu> elements with <choice> children; Input nodes become <field> elements with <grammar> and <filled> blocks; Transfer nodes become <transfer> elements; API nodes generate custom <api> tags for remote data fetching. The exporter ensures proper XML escaping (& → &amp;), handles bilingual prompts with xml:lang attributes, and generates correct <goto next="#form_id"/> transitions based on edge connections.
+ModelToFlowRenderer converts the FlowModel into React Flow JSON for frontend canvas rendering. This is the "anti-corruption layer" between the backend's clean, abstract model and the frontend's visual-specific schema. The renderer auto-calculates node positions using a deterministic grid formula, dynamically injects React Flow "ports" based on node type (a BUSINESS_HOURS node gets "open" and "closed" ports; an INPUT node gets "success" and "timeout" ports), and ensures the canvas never receives an empty or broken model — if the FlowModel is somehow invalid, the renderer produces a minimal Start → End fallback graph so the canvas never crashes.
+6.8 Industry Scenario Diagrams
+The AI pipeline generates domain-appropriate flow structures for each supported industry. The following diagrams illustrate the typical flow topology generated for each vertical:
+
+Figure 6.2 — Banking IVR Flow
+
+
+Figure 6.3 — Healthcare IVR Flow
+
+
+7. AI Provider Management & Circuit Breaker Resiliency
+NexusIVR is designed to never depend on a single AI provider. The platform supports four LLM providers simultaneously, with automatic health monitoring, circuit-breaker-based failure isolation, exponential backoff retry, and deterministic fallback routing. This multi-provider architecture ensures that a rate limit, outage, or misconfiguration at any single provider does not prevent users from generating IVR flows — the system transparently falls through to healthy alternatives.
+7.1 Provider Priority Chain & Fallback Logic
+ProviderManager maintains an ordered registry of AI providers, each wrapped in a health monitor and circuit breaker. The priority order is deterministic and configurable via the AI_PROVIDER environment variable, but the default chain is: Groq (Priority 1) → OpenRouter (Priority 2) → Gemini (Priority 3) → Ollama (Priority 4, local). Each provider has a dedicated client class implementing the LlmClient interface:
+When a generation request arrives, ProviderManager.executeWithRetryAndFallback() iterates through the provider chain. For each provider, it first checks whether the provider's circuit breaker allows a request (see Section 7.2). If the circuit is OPEN, the provider is skipped entirely. If the circuit is CLOSED or HALF_OPEN, the request is attempted. On success, the response is returned and the provider's health counters are reset. On failure, RetryPolicy determines whether the error is retryable — if so, the request is retried with exponential backoff; if not, or if max retries are exhausted, the manager moves to the next provider in the chain.
+If all four providers fail, TemplateGenerator is invoked as the absolute last resort. Unlike the LLM providers, TemplateGenerator is deterministic Java code — it reads pre-built IVR templates from IvrTemplateRegistry, selects the closest domain match (banking, healthcare, restaurant, etc.), validates the generated VXML (checking for exactly one <?xml> and <vxml> tag), and returns it. This guarantees 100% availability for the flow generation feature: no matter how many providers are down, the user always receives a working flow.
+7.2 Circuit Breaker State Machine
+Each provider has its own independent CircuitBreaker instance implementing the classic three-state pattern. The circuit breaker prevents the system from repeatedly hammering a failing provider, which would waste time, money, and potentially trigger abuse-detection on the provider's side.
+
+Figure 7.1 — Circuit Breaker State Machine
+
+The state transitions work as follows: In CLOSED state, all requests are allowed through. Each failure increments a consecutive failure counter. When the counter reaches the threshold, the circuit transitions to OPEN state. However, certain error types trigger an immediate transition to OPEN without waiting for the threshold — specifically, HTTP 401/403 (authentication failures, indicating a misconfigured API key) and HTTP 429 (rate limit exceeded, indicating the provider has actively rejected the request). This distinction is critical and was a hard-won engineering lesson: treating auth failures the same as transient errors would cause the circuit breaker to enter cooldown mode for a provider that simply has a bad API key, when the correct action is to skip it immediately and move to the next provider.
+In OPEN state, all requests are rejected immediately without even attempting a network call — the circuit breaker returns a "provider unavailable" signal to ProviderManager, which then tries the next provider in the chain. A cooldown timer is running; when it expires, the circuit transitions to HALF_OPEN state.
+In HALF_OPEN state, exactly one test request is allowed through. If it succeeds, the circuit resets to CLOSED and the consecutive failure counter is zeroed. If it fails, the circuit returns to OPEN and the cooldown timer restarts. This probe-and-recover pattern allows the system to automatically detect when a provider recovers from an outage without requiring manual intervention.
+7.3 Retry Policy & Exponential Backoff
+RetryPolicy classifies each error as retryable or non-retryable. Retryable errors include: HTTP 429 (rate limit — the provider is temporarily overloaded but will accept requests later), HTTP 500+ (server error — likely a transient issue), network timeouts (the provider didn't respond in time but might be reachable on a retry), and connection errors (DNS resolution or TCP connection failures that might be transient network glitches).
+Non-retryable errors include: HTTP 400 (bad request — our prompt is malformed and resending it won't help), HTTP 401/403 (authentication failure — the API key is wrong and retrying is pointless), HTTP 404 (model not found — the requested model doesn't exist on this provider), and content-level errors (the response parsed successfully but contained an error message rather than generated content).
+For retryable errors, the policy implements exponential backoff: the wait time between retries doubles with each attempt, starting from a base of 500 milliseconds and capping at 30 seconds. The formula is: wait = min(base * 2^attempt, maxBackoff). Maximum retries per provider: 3 attempts. After 3 failures, the manager moves to the next provider rather than continuing to retry a provider that is clearly having sustained issues.
+7.4 Cost Optimization & Quota Routing
+The AI optimization layer includes several cost-conscious mechanisms that work alongside the provider management system:
+QuotaAwareRouter tracks each provider's remaining API quota and routes requests to providers with available budget, preventing expensive overages. TokenUsageTracker monitors input and output token consumption per provider and model, feeding into cost estimation calculations. ProviderCostCatalog maintains a hardcoded price table (cost per 1,000 input/output tokens per provider), enabling the system to calculate approximate generation costs for billing and reporting purposes.
+SemanticCache stores LLM responses using a SHA-256 hash of the composite key (tenant, prompt, provider, domain) and serves cached responses for semantically identical requests. This is particularly effective for the prompt refinement pass (Pass 1), where identical user inputs almost always produce identical refined specifications. The cache uses bounded LRU eviction with a configurable TTL to prevent unbounded memory growth.
+ConversationMemory manages conversational context across multi-turn AI assistant sessions using a sliding window approach. When a conversation exceeds a configurable number of turns, older history is condensed into a single "system summary" node while preserving the exact text of the most recent turns. This prevents token costs from growing linearly with conversation length while maintaining enough context for coherent responses.
+
+8. IVR-AI-Engine Backend Specification
+The IVR-AI-engine is the primary backend service, running on Java 21 with Jakarta Servlet 6.0 on an embedded Apache Tomcat 10 container listening on port 8081. It serves as the single entry point for all control-plane operations: user authentication, multi-tenant CRUD, the 7-pass generative AI pipeline, RAG knowledge base queries, flow publishing with VXML export, AI provider orchestration, telephony resource management (phone numbers, SIP extensions, call queues), system health monitoring, audit logging, and in-app notifications. Every request flows through the BaseAiServlet authentication and tenant-scoping middleware before reaching any business logic.
+8.1 Controller / Servlet Layer
+The controller layer consists of 33 HTTP servlets, all extending BaseAiServlet. The base class provides a comprehensive middleware stack: CORS header injection (handled by CorsFilter), JSON request body parsing via Gson, JWT token validation, tenant ID extraction from the token's claims, and standardized error response formatting. When a request arrives, BaseAiServlet first checks whether the endpoint requires authentication. If it does, the servlet extracts the Authorization header, validates the JWT signature using JwtUtil, decodes the tenant_id claim, and stores it in a request attribute. Any DAO method called downstream can then retrieve this tenant ID and use it to scope all SQL queries — ensuring a tenant can only ever access their own data.
+8.2 Service Layer Business Logic
+The service layer contains over 40 Java classes implementing the platform's core business logic. Beyond the AI pipeline services already covered in Section 6, the key service classes include:
+KnowledgeService manages the RAG (Retrieval-Augmented Generation) pipeline: document ingestion, text chunking, embedding generation via external APIs, and semantic similarity search using PostgreSQL pgvector's HNSW index. When a user asks the AI assistant a question, KnowledgeService queries the embeddings table for the most semantically similar knowledge chunks within the tenant's document corpus, and injects those chunks into the LLM prompt as grounding context — ensuring the AI's answers are based on the company's actual documentation rather than generic training data.
+AsteriskAmiClient connects to the Asterisk Manager Interface (AMI) socket for health probing and command execution. SystemHealthService uses it to verify Asterisk is reachable and responsive, reporting the connection status on the system health dashboard. AsteriskMonitor runs as a background thread providing continuous monitoring of PBX state.
+NotificationService handles the creation and broadcasting of in-app notifications. Events like PAYMENT_SUCCESS, PLAN_OVERRIDE, IVR_PUBLISHED, and SYSTEM_ALERT all trigger notification creation via NotificationDao.insertNotification(). The NotificationBell component on the frontend polls GET /api/notifications every 30 seconds to display unread notifications.
+AuditLogService records all security-critical operations into the audit_logs table. Every company creation, user status change, plan override, IVR publication, and administrative action is logged with the actor's identity, the target entity, a JSON details payload, and the client's IP address — creating a complete, tamper-evident compliance trail.
+8.3 Data Access Layer & Tenant Isolation
+The DAO layer consists of 19 data access classes, each implementing raw JDBC queries with PreparedStatement parameter binding via HikariCP connection pooling. No ORM is used — all SQL is hand-written, giving the team full control over query structure and performance characteristics. Every single DAO method that reads or writes tenant-specific data includes a WHERE tenant_id = ? clause, with the tenant ID provided by the servlet layer (extracted from the JWT token, never from client-supplied request parameters).
+This pattern is not optional or best-effort — it is enforced by code review discipline and the architectural invariant that BaseAiServlet.extractTenantId() is the ONLY source of tenant identity. A DAO method that queries without a tenant_id filter would represent a critical security vulnerability, and the codebase treats any such omission as a bug of the highest severity.
+8.4 Security: JWT Authentication & Password Hashing
+JwtUtil generates and validates JWT tokens with HMAC-SHA256 signing. The token payload includes claims for sub (user UUID), email, tenantId (UUID or null for Super Admins), isSuperadmin (boolean), and exp (expiration timestamp, set to 24 hours from issuance). The JWT secret is loaded from the JWT_SECRET environment variable — it is not hardcoded in source code.
+PasswordUtil implements SHA-256 password hashing with salt for new user registrations. However, a legacy compatibility issue exists: migration script 009_users_and_tenants.sql inserts seed users (admin@nexusivr.com and user@nexusivr.com) with plain-text passwords ("admin" and "user"). To handle this, UserDao includes a fallback plain-text comparison path — if SHA-256 verification fails, it attempts a direct string comparison against the stored value. This allows the seeded accounts to log in while newly created accounts use proper hashing. The PDF reference document mentions Argon2id hashing as the target, but the actual codebase uses SHA-256 — this is a discrepancy between documentation intent and implemented code.
+
+9. FastAGI Telephony Engine (IVR-Engine)
+The IVR-engine is the runtime telephony execution engine — the component that makes phones actually ring and respond. It runs on Java 21 with the Asterisk-Java 3.x library and a custom JVoiceXML 0.7.7 platform implementation, listening for incoming FastAGI protocol requests on TCP port 4573. Unlike the AI engine (which handles design-time operations), the IVR-engine handles data-plane operations — live, real-time telephone calls where latency and reliability are paramount.
+9.1 Live Call Execution Sequence Diagram
+
+Figure 9.1 — Live Call Execution: Sequence
+
+The sequence begins when a telephone caller dials a number that Asterisk has mapped to an IVR extension. Asterisk's dialplan (extensions.conf) matches the dialed extension and executes the AGI() application, which opens a TCP socket connection to the FastAGI server running on port 4573. The DefaultAgiServer (from the Asterisk-Java library) accepts the connection and dispatches it to VxmlAgiHandler based on the fastagi-mapping.properties configuration.
+9.2 VoiceXML DOM Interpreter
+VxmlScenarioEngine is a custom VoiceXML interpreter that walks the parsed XML DOM tree and executes each element against the live Asterisk channel. Unlike a browser rendering HTML, this engine "renders" XML into audio and telephone actions. For each <form> element, it processes child elements in sequence: <block> elements execute unconditionally; <field> elements set up input collection with grammar constraints; <menu> elements present choices and wait for DTMF selection. <goto> elements navigate to other forms within the document, while <submit> elements can POST collected data to external HTTP endpoints. <transfer> elements bridge the call to another phone number or queue.
+The engine maintains a VxmlSession object that holds all runtime state: collected field values, ECMAScript variable scope, execution status (RUNNING, COMPLETED, ERROR), caller ID, call duration, and the complete event timeline. VxmlSession provides typed variable extraction methods (getVariableAsInt, getVariableAsString) with safe defaults, preventing runtime ClassCastExceptions when dealing with untyped DTMF input.
+9.3 Text-to-Speech Engine & Audio Pipeline
+TtsEngine handles dynamic voice prompt generation for any text that doesn't have a pre-recorded audio file. The synthesis pipeline has three stages:
+Stage 1 — Speech synthesis: TtsEngine invokes a Python subprocess running gTTS (Google Text-to-Speech) to generate an MP3 audio file from the text string. This supports multiple languages including English and Arabic.
+Stage 2 — Format transcoding: The MP3 is transcoded using ffmpeg into Asterisk-native formats: WAV (8kHz mono PCM16), GSM, ULAW, and SLN16. These formats are optimized for telephony — wideband audio would be wasted on a telephone channel that only carries 300-3400 Hz bandwidth.
+Stage 3 — Caching: The generated audio files are cached on disk at /var/lib/asterisk/sounds/ivr-tts/ using a SHA-256 hash of the text content as the filename. This means the phrase "Welcome to our restaurant" is synthesized exactly once, no matter how many calls play it. Subsequent calls load the cached file directly, adding zero latency.
+A critical engineering detail: TtsEngine uses asynchronous background threads to continuously drain the stdout and stderr streams of the ffmpeg/python subprocesses. Without this, the subprocess would block indefinitely once the OS pipe buffer fills up — hanging the phone call in silence while the caller waits. This is a classic Unix process deadlock pattern, and the drain threads prevent it. Additionally, a strict 120-second timeout is enforced on all subprocess executions to prevent a misbehaving TTS synthesis from holding a call channel indefinitely.
+9.4 Asterisk Dialplan Auto-Provisioning
+When a flow is published (Section 3, Step 6), the add_extension.sh bash script performs live Asterisk dialplan provisioning. The script is designed to be idempotent — running it multiple times for the same extension produces the same result, with no duplicate entries or stale configurations. It achieves this by first using sed to delete any existing dialplan entries for the target extension number, then injecting a fresh dialplan stanza that sets the VXML_FILE channel variable and routes the call to the FastAGI server:
+exten => 500,1,NoOp(Incoming call for VXML Scenario: restaurant_reservation)
+exten => 500,n,Answer()
+exten => 500,n,Set(VXML_FILE=tenant123_restaurant_reservation)
+exten => 500,n,AGI(agi://127.0.0.1:4573/default)
+exten => 500,n,Hangup()
+After injecting the stanza, the script executes asterisk -rx "dialplan reload" to hot-reload the configuration. This is a non-disruptive operation — calls currently in progress are not affected; only new incoming calls will use the updated dialplan. The script runs with passwordless sudo via a tightly scoped sudoers entry that allows only this specific script to be executed, following the principle of least privilege.
+
+10. Payment Service & Subscription Management
+The IVR-payment-service is a standalone Java microservice running on Tomcat port 8082, responsible for the entire SaaS billing lifecycle: plan catalog management, Paymob payment gateway integration, HMAC-secured webhook processing, subscription activation, and automated expiration enforcement. It shares the same PostgreSQL database as the AI engine but operates as an independent service with its own Dockerfile, health check, and configuration.
+10.1 Paymob Gateway Integration (3-Step Handshake)
+When a Tenant Admin decides to upgrade their subscription, the payment flow begins in TenantBilling.tsx, which displays the available plans (fetched from GET /api/payment/plans) alongside the tenant's current billing status. The user selects a plan and clicks "Subscribe," triggering a POST to /api/payment/initiate with their planId and billing data.
+PaymentService.initiateSubscriptionPayment() then executes the Paymob 3-step handshake, a sequential API interaction that creates a payment session on Paymob's servers:
+Step 1 — Authentication: The service sends a POST to https://accept.paymob.com/api/auth/tokens with the PAYMOB_API_KEY, receiving back a temporary authentication token valid for the duration of this checkout session. This token proves the merchant's identity to Paymob.
+Step 2 — Order Registration: Using the authentication token, the service sends a POST to https://accept.paymob.com/api/ecommerce/orders with the order details: amount in piasters (Egyptian currency subunit; 150,000 piasters = 1,500 EGP for the Business plan), currency code (EGP), and a merchant order reference. Paymob returns an order_id that uniquely identifies this transaction.
+Step 3 — Payment Key Generation: A final POST to https://accept.paymob.com/api/acceptance/payment_keys generates a one-time payment token that authorizes the customer to charge a specific amount to a specific order. The service constructs the hosted checkout iframe URL by combining Paymob's iframe endpoint with the payment token: https://accept.paymob.com/api/acceptance/iframes/{PAYMOB_IFRAME_ID}?payment_token={token}
+Before returning the iframe URL to the frontend, PaymentService writes a PENDING transaction record to the transactions table, capturing the tenant ID, plan ID, amount, and Paymob order ID. This record serves as a reconciliation anchor — if the webhook fails to arrive (network issue, Paymob outage), the system can later query Paymob's API directly using the stored order ID to verify the payment status.
+
+
+10.2 HMAC Signature Verification
+After the customer completes payment on Paymob's hosted checkout page, Paymob sends a webhook notification to POST /api/payment/callback. This webhook carries a JSON payload containing transaction details and a cryptographic signature in the hmac parameter. HmacVerifier validates this signature to ensure the webhook genuinely originated from Paymob and has not been tampered with in transit.
+The HMAC calculation follows Paymob's strict specification: HmacVerifier concatenates the callback JSON fields in an exact, prescribed sequence — amount_cents, created_at, currency, error_occured, has_parent_transaction, id, integration_id, is_3d_secure, is_auth, is_capture, is_standalone_payment, is_voided, order.id, owner, pending, source_data.pan, source_data.sub_type, source_data.type, success — hashes the concatenated string using HMAC-SHA512 with the PAYMOB_HMAC_SECRET key, and compares the result against the hmac parameter from the webhook. If the signatures do not match, the callback is rejected as potentially fraudulent.
+On valid signature and success == true, the payment service executes a three-step activation sequence: (1) TransactionDao.updateStatus(transactionId, "SUCCESS") marks the transaction as paid; (2) TenantDao.updateSubscription(tenantId, planId, "ACTIVE", NOW() + 30 days) activates the subscription with a 30-day expiration; (3) NotificationDao.insert() creates an in-app notification informing the tenant their plan has been upgraded. The browser is then redirected to /payment-callback?status=success.
+10.3 Subscription Lifecycle & Auto-Expiration
+SubscriptionScheduler is a background task started by AppServletContextListener during servlet container initialization. It executes every 24 hours using a ScheduledExecutorService, querying the tenants table for rows where subscription_expires_at < NOW() and subscription_status = "ACTIVE". For each expired subscription, it sets subscription_status = "INACTIVE", effectively downgrading the tenant to the free tier. This enforcement mechanism ensures tenants cannot continue using paid features after their subscription period ends, maintaining the integrity of the SaaS billing model.
+PaymobHttpClient also provides an inquireTransaction() method that serves as a webhook fallback. If a server-to-server webhook is missed (due to network issues, server restart, or Paymob-side delivery failure), the system can actively poll Paymob by transaction ID to verify payment status. The GET /api/payment/verify endpoint exposes this capability to the frontend — PaymentCallback.tsx calls it on page load to handle cases where the browser redirect succeeded but the webhook didn't.
+
+
+11. Database Architecture & Schema Reference
+The platform is built on PostgreSQL 15+ combined with the pgvector 0.5+ extension, enabling both traditional relational data storage and semantic vector similarity search within the same database engine. The schema is managed through 17 versioned migration scripts (numbered 000 through 015, plus a payment-specific migration), applied in order during deployment. Two PostgreSQL extensions are required: pgcrypto for UUID generation (gen_random_uuid()) and pgvector for the embedding vector data type and similarity operators.
+11.1 Entity-Relationship Diagram
+
+Figure 11.1 — Core Database Tables
+
+11.2 Complete Table Specifications
+The following reference tables document every column, data type, constraint, and index across all 21 database tables. Each table follows a consistent pattern: UUID primary keys generated by pgcrypto's gen_random_uuid(), a tenant_id foreign key on every tenant-scoped table, and created_at timestamps defaulting to NOW().
+11.3 Vector Search & RAG Pipeline
+The RAG (Retrieval-Augmented Generation) pipeline allows each tenant to upload domain-specific documents (company policies, product catalogs, FAQ databases) that are chunked, embedded into 1536-dimensional vectors using an external embedding API, and stored in the embeddings table. When the AI assistant receives a user question, KnowledgeService queries the embeddings table using pgvector's cosine similarity operator (<=>) against the question's embedding vector, filtered by tenant_id, retrieving the top-K most semantically similar knowledge chunks.
+The HNSW (Hierarchical Navigable Small World) index — created as idx_embeddings_vector_hnsw with parameters m=16 and ef_construction=64 — enables approximate nearest-neighbor search that runs in sub-millisecond time even at scale. Without this index, cosine similarity search would require a sequential scan of every embedding row, which becomes prohibitively slow as the knowledge base grows. The HNSW index trades a small amount of recall accuracy for dramatically improved query speed — typically under 10ms for databases with tens of thousands of embeddings.
+
+12. Multi-Tenant Isolation & Security Model
+Because all tenant companies share the same physical infrastructure — the same database, the same application servers, the same Asterisk PBX — data isolation between them is the single most critical security guarantee the platform must uphold. A failure of tenant isolation would mean one company could see another company's IVR flows, call recordings, customer data, or billing information — a catastrophic privacy and regulatory violation. NexusIVR enforces this isolation using three independent, defense-in-depth layers, meaning that even if one layer were to fail or be misconfigured, the remaining layers still prevent a cross-tenant data leak.
+12.1 Three-Layer Defense-in-Depth Architecture
+
+Figure 12.1 — Multi-Tenant Isolation: Three-Layer Defense
+
+Layer 1 — Schema Level: Every tenant-scoped table includes a tenant_id UUID column with a foreign key constraint to tenants(id). This structural guarantee means no row can exist in isolation without being associated with a specific tenant. Even if application code were to attempt inserting data without a tenant_id, the NOT NULL constraint on the column would cause the INSERT to fail at the database level.
+Layer 2 — Application Level: BaseAiServlet, the superclass of all 33 API servlets, extracts the tenant_id from the JWT token's claims during request processing. This tenant_id is then passed to every DAO method as a parameter. The critical invariant here is that the tenant_id comes exclusively from the cryptographically-signed JWT token — never from a query parameter, request body, or URL path segment that a malicious client could tamper with. Every DAO query includes WHERE tenant_id = ? as a mandatory filter.
+Layer 3 — Database Level (RLS): PostgreSQL's Row-Level Security feature can enforce tenant isolation at the database engine level itself, acting as a final safety net even if the application layer has a bug. This layer is architecturally planned and the schema supports it, but RLS policies are not yet fully deployed in the current build — this remains an identified gap that the team plans to close.
+
+13. IVR-Webapp Frontend Specification
+The IVR-webapp is a single-page application (SPA) built with React 19, TypeScript 5, Vite as the build tool, and Tailwind CSS for utility-first styling. It serves as the primary user interface for both Tenant Admins and Super Admins. The application uses client-side routing (React Router) with role-based route guards, localStorage-backed session persistence, and an Axios HTTP client configured with automatic JWT token injection. The production build is served by an Nginx reverse proxy container on port 3000.
+13.1 Tenant Admin Screens
+Tenant Admin Dashboard
+The TenantAdminDashboard.tsx screen is the landing page after login. It displays operational metrics specific to the logged-in tenant: total calls received, call success rate, number of active/published IVR flows, and a recent call history table. The dashboard fetches data from GET /api/dashboard, which aggregates metrics from the ai_sessions, flows, and call_analytics tables filtered by the tenant's ID. Metric cards use subtle gradient backgrounds and real-time refresh on a 60-second interval.
+
+IVR Builder
+The IVRBuilder.tsx screen is the core product experience — a visual drag-and-drop workspace for designing IVR call flows. The screen is divided into three zones: the Node Library sidebar on the left, the FlowCanvas workspace in the center, and the Properties Panel on the right. The AI Assistant chat drawer overlays the right side and can be toggled via the floating AI button.
+The Node Library (NodeLibrary.tsx) displays a categorized list of draggable node types: Start, Menu, Input, Transfer, Queue, API, AI, Business Hours, Custom, Greeting, and End. Users drag nodes from this library onto the canvas, where they appear as positioned HTML divs. Connections are drawn by clicking a node's output port and dragging to another node's input port — the system draws a dashed SVG path during the drag operation and solidifies it on drop.
+The FlowCanvas (FlowCanvas.tsx) is a custom SVG+HTML hybrid rendering engine supporting infinite panning (click-and-drag background), zoom (mouse wheel), node selection, multi-select (with Ctrl+click), edge drawing, and a MiniMap overlay for navigating large flows. Nodes display visual validation state through colored borders: green (valid), amber (warning), red (error), and pulsing blue (simulating). The canvas fires onDropNode events when new nodes are added and calls graphEngine.analyzeGraph() after every structural change to update validation status in real time.
+The Properties Panel (PropertiesPanel.tsx) shows context-sensitive configuration for the selected node: for a Menu node, it displays editable choice labels and DTMF key assignments; for an Input node, it shows field name, grammar type, and timeout settings; for a Transfer node, it shows the destination number or queue name. Changes are immediately reflected on the canvas node and in the underlying flow_json data structure.
+
+
+
+AI Assistant
+The AIAssistant.tsx screen provides a standalone full-page AI chat interface (separate from the inline drawer in the IVR Builder). Users can have multi-turn conversations with the RAG-augmented AI assistant, which has access to the tenant's uploaded knowledge base documents. The chat interface shows a message history with styled user and assistant message bubbles, a text input area with send button, and a session selector for managing multiple conversation threads.
+
+Call Analytics
+CallAnalytics.tsx provides granular Call Detail Record (CDR) reporting. The primary view is a filterable, sortable data table showing all calls: timestamp, caller ID, duration, status (ANSWERED, MISSED, BUSY, FAILED), and the last VXML node visited. Clicking into a specific call reveals the Call Events Timeline — a visual map of the caller's journey through the IVR, showing each menu selection, each input capture, each transfer attempt, and the final outcome. If call recording is enabled, an inline audio player allows playback of the call recording.
+
+
+Queue Management
+QueueManagement.tsx allows Tenant Admins to create, edit, and delete ACD (Automatic Call Distribution) queues. Each queue has a name, a distribution strategy (round-robin, least-recent, ring-all, or linear), a timeout duration, a maximum wait time, and a members list (JSONB array of SIP extension URIs). The UI presents a table of queues with inline action buttons for edit and delete, plus a modal form for creating new queues.
+
+SIP Extensions
+SIPExtensions.tsx manages PJSIP endpoints for the tenant's Asterisk server. The screen shows a table of SIP extensions with two real-time status indicators: Registration Status (Registered, Registering, Offline) and Call Status (Idle, In Call, Ringing). A slide-out form allows adding new extensions with fields for Extension Number, Display Name, SIP Password, and security flags (TLS/SRTP transport selction).
+
+Voice Prompts
+VoicePrompts.tsx is the central audio asset repository. Users can upload pre-recorded WAV files or generate synthetic speech using the integrated TTS generator. The library view shows a grid or table of audio files with file size, duration, language, and a "Used in" column indicating which IVR nodes reference each prompt. Each row includes a custom waveform audio player for quick preview. The TTS generator accepts text input in English or Arabic and calls POST /api/voice-prompts/generate to synthesize audio on the backend using gTTS + ffmpeg.
+
+Tenant Billing
+TenantBilling.tsx displays the tenant's current subscription plan, billing status, and available upgrade options. Plan cards show tier name, monthly price (in EGP), included features (max flows, max calls/month, AI generation credits, knowledge base storage), and a "Subscribe" button. When the user clicks Subscribe, the frontend initiates the Paymob checkout flow described in Section 10, opening an iframe to the Paymob hosted payment page.
+
+Settings
+Settings.tsx provides tenant-level configuration options including profile management (company name, domain, timezone), notification preferences, and API access settings.
+
+13.2 Super Admin Screens
+Super Admin Dashboard
+SuperAdminDashboard.tsx is the platform-wide overview restricted to Super Admin role. It uses the recharts library for data visualization, displaying top-level metric cards (Total Companies, Active Calls, AI Requests Today, Monthly Revenue), an AreaChart tracking monthly company growth, BarCharts showing AI request volume by provider, and tables listing recently registered companies and a real-time activity feed.
+
+Company Management
+SuperAdminCompanies.tsx provides full CRUD management for tenant companies. The Super Admin can create new tenants (which also creates the initial admin user for that company), suspend or reactivate companies, manually override subscription plans (for example, granting a trial extension or upgrading a customer during a sales call), and view each company's usage metrics. All actions on this page are recorded in the audit_logs table with the Super Admin's identity.
+
+System Health
+SystemHealth.tsx is a real-time DevOps diagnostic dashboard. It displays four main health cards: JVM Runtime (heap memory usage bar, thread counts, GC statistics), Database Pool (HikariCP active vs. idle connections, pending queries, connection wait time), Asterisk AMI (connection state, target host, last successful ping), and AI Provider Circuit Summary (circuit breaker state for each configured provider). A detailed table below lists each LLM provider with its current circuit breaker state (OPEN/CLOSED/HALF_OPEN), consecutive failure count, last error message, and cooldown timer. Auto-refresh polls GET /api/system-health every 5 seconds (toggleable via checkbox), sending the X-Is-SuperAdmin header for authorization.
+
+Super Admin Settings
+SuperAdminSettings.tsx provides global configuration through a tabbed interface with sections: General (platform name, default language), Security (password policy strength, 2FA enforcement), Email & SMTP (Mailgun/SMTP credentials for transactional email), Alerts (CPU/memory threshold configuration), and a "Danger Zone" with high-risk operations like clearing Redis cache and enabling Maintenance Mode.
+
+13.3 Visual IVR Builder Engine
+The IVR builder engine is the most technically complex piece of the frontend, consisting of 9 tightly integrated TypeScript files that collectively implement a graph editor, validation engine, layout algorithm, VXML compiler, and AI integration layer.
+graphEngine.ts is the computational brain. Its analyzeGraph() function runs in O(N) time using adjacency maps and detects: disconnected nodes, orphans (nodes with no incoming or outgoing edges), dead ends (non-terminal nodes with no outgoing edges), circular self-loops (via DFS cycle detection), missing start nodes, and missing error-handling paths. It calculates a structural integrity score out of 100 based on the severity and count of detected issues. It also provides reconnectAfterDelete() — when a user deletes a node in the middle of a flow, the engine intelligently stitches the incoming edges to the outgoing edges, automatically repairing the flow topology instead of leaving dangling connections that would break the IVR.
+flowParser.ts bridges AI output and the visual canvas. When the LLM generates a flow JSON structure, the parser safely extracts it, repairs double-encoded UTF-8 artifacts, validates node and edge IDs, and — if the AI didn't provide X/Y coordinates — calculates a clean hierarchical tree layout using subtree height analysis (layoutTree), ensuring generated flows appear as organized diagrams rather than overlapping chaos.
+vxmlExporter.ts compiles the proprietary React graph schema into standard VoiceXML 2.1. It traverses the graph via BFS, mapping each node type to specific VXML constructs: dtmf_menu nodes become <menu> elements with <choice> children; api nodes generate <api> tags; ai nodes wrap custom <ai> tags for generative responses. It handles bilingual <prompt xml:lang="en|ar"> blocks, calculates dynamic <goto next="#form_id"/> transitions based on edge connections, and falls back to legacy audio file references when specified.
+
+14. Complete REST API Endpoint Reference
+The following table documents every REST API endpoint exposed by the NexusIVR backend services. All endpoints on IVR-AI-engine (port 8081) require JWT authentication unless noted. The tenant_id is always extracted from the JWT token claims — never from request parameters.
+
+15. Infrastructure, Docker & Environment Configuration
+The platform deploys as a five-container Docker Compose stack with a remote PostgreSQL database hosted on NeonDB (serverless Postgres-as-a-Service). The compose file uses version 3.8 syntax with health-check-gated service dependencies to ensure correct startup ordering.
+Environment Variables
+* At least one AI provider API key is required; additional keys enable fallback resilience.
+Docker Compose Startup Sequence
+
+Figure — Container Startup Dependency Order
+
+
+16. Known Limitations, Technical Debts & Clarification Items
+The following items represent known gaps, technical debts, and areas where the codebase deviates from either the documented specification or ideal engineering practice. Each item is sourced from actual code inspection, not from documentation claims.
+
+17. Feature Matrix & AI Roadmap
+Current Feature Status
+AI Feature Roadmap
+The AI module roadmap spans 14 distinct planned features at various stages of maturity, organized around the fundamental design-time vs. run-time separation:
+Design-Time AI Features:
+AI Flow Generator/Improver (implemented): The core 7-pass generation capability. AI Validation (implemented): Deterministic structural review via ModelFlowValidator. RAG/Knowledge Base Pipeline (implemented): Tenant-specific document embedding and retrieval. Multi-turn Canvas Editing (planned): Conversational, iterative modification of the visual Canvas — e.g., "add a queue node after the greeting" would directly manipulate the graph.
+Run-Time AI Features:
+AI Assistant Node (partially implemented): A complete STT → LLM → TTS conversational loop executed live during a phone call. AI Router (planned): Intelligently routes incoming calls based on the caller's expressed intent rather than fixed DTMF menus. Conversation Memory (planned): Redis + PostgreSQL backed conversational context persistence so returning callers' history informs the interaction.
+
+18. Glossary of Key Terms

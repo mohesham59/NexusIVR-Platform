@@ -113,18 +113,14 @@ export function testSmartDeleteAndApplySuggestionStateReconciliation(): boolean 
     { id: 'e6', sourceId: 'res', sourcePort: 'out', targetId: 'end', targetPort: 'in' },
   ]
 
-  // Step 1: Delete 3 nodes (tech, prof, res)
+  // Step 1: Delete 1 intermediate node (tech), leaving prof and res converging into end
   let res = reconnectAfterDelete(nodes, edges, 'tech')
-  nodes = res.nodes; edges = res.edges
-  res = reconnectAfterDelete(nodes, edges, 'prof')
-  nodes = res.nodes; edges = res.edges
-  res = reconnectAfterDelete(nodes, edges, 'res')
   nodes = res.nodes; edges = res.edges
 
   // Step 2: Diagnostics flag converging paths on Start or End
   let diag = analyzeGraph(nodes, edges)
   if (diag.convergingNodes.length === 0) {
-    throw new Error('Deleting 3 nodes must flag converging paths / collapsed hub')
+    throw new Error('Deleting intermediate node with multiple remaining branches must flag converging paths / collapsed hub')
   }
 
   // Step 3: Simulate suggestion generation with deterministic ID

@@ -284,6 +284,16 @@
         <url-pattern>/api/v1/voice-prompts/generate</url-pattern>
     </servlet-mapping>
 
+    <!-- Browser TTS Preview (IVR Builder Test Simulator) - returns audio/mpeg -->
+    <servlet>
+        <servlet-name>TtsPreviewServlet</servlet-name>
+        <servlet-class>com.nexusivr.ai.controller.TtsPreviewServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>TtsPreviewServlet</servlet-name>
+        <url-pattern>/api/v1/tts/preview</url-pattern>
+    </servlet-mapping>
+
     <!-- Notifications Servlet -->
     <servlet>
         <servlet-name>NotificationServlet</servlet-name>

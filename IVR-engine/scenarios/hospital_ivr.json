@@ -1,0 +1,486 @@
+{
+  "nodes": [
+    {
+      "id": "n1",
+      "type": "start",
+      "x": 100,
+      "y": 260,
+      "title": "Start",
+      "subtitle": "Entry Point",
+      "status": "valid",
+      "collapsed": false,
+      "disabled": false,
+      "ports": [
+        {
+          "id": "out",
+          "label": "Continue",
+          "type": "output",
+          "color": "#8B5CF6"
+        }
+      ],
+      "prompt": "Welcome to Nexus Hospital. For English press 1. For Arabic press 2.مرحبًا بكم في مستشفى نيكسس. للغة الإنجليزية اضغط 1، وللغة العربية اضغط 2.",
+      "promptEn": "Welcome to Nexus Hospital. For English press 1. For Arabic press 2.",
+      "promptAr": "مرحبًا بكم في مستشفى نيكسس. للغة الإنجليزية اضغط 1، وللغة العربية اضغط 2."
+    },
+    {
+      "id": "n2",
+      "type": "dtmf_menu",
+      "x": 380,
+      "y": 260,
+      "title": "Language Selection",
+      "subtitle": "Select Language",
+      "status": "valid",
+      "collapsed": false,
+      "disabled": false,
+      "menuOptionsCount": 2,
+      "ports": [
+        {
+          "id": "key1",
+          "label": "English (1)",
+          "type": "output",
+          "color": "#8B5CF6"
+        },
+        {
+          "id": "key2",
+          "label": "Arabic (2)",
+          "type": "output",
+          "color": "#8B5CF6"
+        },
+        {
+          "id": "timeout",
+          "label": "Timeout",
+          "type": "output",
+          "color": "#8B5CF6"
+        }
+      ],
+      "promptEn": "For English press 1. For Arabic press 2.",
+      "promptAr": "للإنجليزية اضغط 1. للعربية اضغط 2."
+    },
+    {
+      "id": "n3",
+      "type": "variable",
+      "x": 660,
+      "y": 160,
+      "title": "Set Lang EN",
+      "subtitle": "Set language = en",
+      "status": "valid",
+      "collapsed": false,
+      "disabled": false,
+      "ports": [
+        {
+          "id": "out",
+          "label": "Continue",
+          "type": "output",
+          "color": "#8B5CF6"
+        }
+      ],
+      "variableName": "language",
+      "variableValue": "en"
+    },
+    {
+      "id": "n4",
+      "type": "variable",
+      "x": 660,
+      "y": 360,
+      "title": "Set Lang AR",
+      "subtitle": "Set language = ar",
+      "status": "valid",
+      "collapsed": false,
+      "disabled": false,
+      "ports": [
+        {
+          "id": "out",
+          "label": "Continue",
+          "type": "output",
+          "color": "#8B5CF6"
+        }
+      ],
+      "variableName": "language",
+      "variableValue": "ar"
+    },
+    {
+      "id": "n5",
+      "type": "dtmf_menu",
+      "x": 940,
+      "y": 160,
+      "title": "English Main Menu",
+      "subtitle": "1-Appointments 2-Doctors 3-Depts 4-Emergency 5-Pharmacy 6-Lab 7-Radiology 8-Insurance 9-PatientInfo 0-Operator",
+      "status": "valid",
+      "collapsed": false,
+      "disabled": false,
+      "menuOptionsCount": 10,
+      "ports": [
+        {
+          "id": "key1",
+          "label": "Appointments (1)",
+          "type": "output",
+          "color": "#8B5CF6"
+        },
+        {
+          "id": "key2",
+          "label": "Doctors (2)",
+          "type": "output",
+          "color": "#8B5CF6"
+        },
+        {
+          "id": "key3",
+          "label": "Departments (3)",
+          "type": "output",
+          "color": "#8B5CF6"
+        },
+        {
+          "id": "key4",
+          "label": "Emergency (4)",
+          "type": "output",
+          "color": "#8B5CF6"
+        },
+        {
+          "id": "key5",
+          "label": "Pharmacy (5)",
+          "type": "output",
+          "color": "#8B5CF6"
+        },
+        {
+          "id": "key6",
+          "label": "Laboratory (6)",
+          "type": "output",
+          "color": "#8B5CF6"
+        },
+        {
+          "id": "key7",
+          "label": "Radiology (7)",
+          "type": "output",
+          "color": "#8B5CF6"
+        },
+        {
+          "id": "key8",
+          "label": "Insurance (8)",
+          "type": "output",
+          "color": "#8B5CF6"
+        },
+        {
+          "id": "key9",
+          "label": "Patient Info (9)",
+          "type": "output",
+          "color": "#8B5CF6"
+        },
+        {
+          "id": "key0",
+          "label": "Operator (0)",
+          "type": "output",
+          "color": "#8B5CF6"
+        }
+      ],
+      "promptEn": "Nexus Hospital Main Menu. Press 1 for Appointments, 2 for Doctors, 3 for Departments, 4 for Emergency, 5 for Pharmacy, 6 for Laboratory, 7 for Radiology, 8 for Insurance, 9 for Patient Information, 0 for Operator."
+    },
+    {
+      "id": "n6",
+      "type": "dtmf_menu",
+      "x": 940,
+      "y": 360,
+      "title": "Arabic Main Menu",
+      "subtitle": "1-المواعيد 2-الأطباء 3-الأقسام 4-الطوارئ 5-الصيدلية 6-المعمل 7-الأشعة 8-التأمين 9-معلومات المريض 0-الموظف",
+      "status": "valid",
+      "collapsed": false,
+      "disabled": false,
+      "menuOptionsCount": 10,
+      "ports": [
+        {
+          "id": "key1",
+          "label": "المواعيد (1)",
+          "type": "output",
+          "color": "#8B5CF6"
+        },
+        {
+          "id": "key2",
+          "label": "الأطباء (2)",
+          "type": "output",
+          "color": "#8B5CF6"
+        },
+        {
+          "id": "key3",
+          "label": "الأقسام (3)",
+          "type": "output",
+          "color": "#8B5CF6"
+        },
+        {
+          "id": "key4",
+          "label": "الطوارئ (4)",
+          "type": "output",
+          "color": "#8B5CF6"
+        },
+        {
+          "id": "key5",
+          "label": "الصيدلية (5)",
+          "type": "output",
+          "color": "#8B5CF6"
+        },
+        {
+          "id": "key6",
+          "label": "المعمل (6)",
+          "type": "output",
+          "color": "#8B5CF6"
+        },
+        {
+          "id": "key7",
+          "label": "الأشعة (7)",
+          "type": "output",
+          "color": "#8B5CF6"
+        },
+        {
+          "id": "key8",
+          "label": "التأمين (8)",
+          "type": "output",
+          "color": "#8B5CF6"
+        },
+        {
+          "id": "key9",
+          "label": "معلومات المريض (9)",
+          "type": "output",
+          "color": "#8B5CF6"
+        },
+        {
+          "id": "key0",
+          "label": "الموظف (0)",
+          "type": "output",
+          "color": "#8B5CF6"
+        }
+      ],
+      "promptAr": "القائمة الرئيسية لمستشفى نيكسس. اضغط 1 للمواعيد، 2 للأطباء، 3 للأقسام، 4 للطوارئ، 5 للصيدلية، 6 للمعمل، 7 للأشعة، 8 للتأمين، 9 لمعلومات المريض، 0 للتحدث مع الموظف."
+    },
+    {
+      "id": "n7",
+      "type": "variable",
+      "x": 1220,
+      "y": 100,
+      "title": "Appointments EN",
+      "subtitle": "Enter Patient ID",
+      "status": "valid",
+      "collapsed": false,
+      "disabled": false,
+      "ports": [
+        {
+          "id": "out",
+          "label": "Continue",
+          "type": "output",
+          "color": "#8B5CF6"
+        }
+      ],
+      "promptEn": "Please enter your patient ID followed by the pound key.",
+      "variableName": "patient_id",
+      "variableValue": ""
+    },
+    {
+      "id": "n8",
+      "type": "variable",
+      "x": 1220,
+      "y": 200,
+      "title": "Appointments AR",
+      "subtitle": "أدخل رقم المريض",
+      "status": "valid",
+      "collapsed": false,
+      "disabled": false,
+      "ports": [
+        {
+          "id": "out",
+          "label": "Continue",
+          "type": "output",
+          "color": "#8B5CF6"
+        }
+      ],
+      "promptAr": "من فضلك أدخل رقم المريض ثم اضغط علامة الشباك.",
+      "variableName": "patient_id",
+      "variableValue": ""
+    },
+    {
+      "id": "n9",
+      "type": "transfer",
+      "x": 1220,
+      "y": 300,
+      "title": "Emergency Flow",
+      "subtitle": "Emergency Transfer",
+      "status": "valid",
+      "collapsed": false,
+      "disabled": false,
+      "ports": [
+        {
+          "id": "success",
+          "label": "Transferred",
+          "type": "output",
+          "color": "#8B5CF6"
+        },
+        {
+          "id": "fail",
+          "label": "Failed",
+          "type": "output",
+          "color": "#8B5CF6"
+        }
+      ],
+      "promptEn": "For medical emergencies, please call emergency department or stay on line for operator.",
+      "promptAr": "في حالات الطوارئ الطبية يرجى التواصل مع الطوارئ أو الانتظار للتحدث مع موظف."
+    },
+    {
+      "id": "n10",
+      "type": "transfer",
+      "x": 1220,
+      "y": 400,
+      "title": "Operator Transfer",
+      "subtitle": "Transfer to Operator",
+      "status": "valid",
+      "collapsed": false,
+      "disabled": false,
+      "ports": [
+        {
+          "id": "success",
+          "label": "Transferred",
+          "type": "output",
+          "color": "#8B5CF6"
+        },
+        {
+          "id": "fail",
+          "label": "Failed",
+          "type": "output",
+          "color": "#8B5CF6"
+        }
+      ],
+      "promptEn": "Connecting you to an operator. Please hold.",
+      "promptAr": "جاري تحويلك إلى خدمة العملاء. يرجى الانتظار."
+    },
+    {
+      "id": "n11",
+      "type": "end",
+      "x": 1500,
+      "y": 260,
+      "title": "End Call",
+      "subtitle": "Hang up",
+      "status": "valid",
+      "collapsed": false,
+      "disabled": false,
+      "ports": [],
+      "promptEn": "Thank you for calling Nexus Hospital. Goodbye.",
+      "promptAr": "شكرًا لاتصالكم بمستشفى نيكسس. مع السلامة."
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "sourceId": "n1",
+      "sourcePort": "out",
+      "targetId": "n2",
+      "targetPort": "in",
+      "label": "Start to Lang"
+    },
+    {
+      "id": "e2",
+      "sourceId": "n2",
+      "sourcePort": "key1",
+      "targetId": "n3",
+      "targetPort": "in",
+      "label": "English"
+    },
+    {
+      "id": "e3",
+      "sourceId": "n2",
+      "sourcePort": "key2",
+      "targetId": "n4",
+      "targetPort": "in",
+      "label": "Arabic"
+    },
+    {
+      "id": "e4",
+      "sourceId": "n3",
+      "sourcePort": "out",
+      "targetId": "n5",
+      "targetPort": "in",
+      "label": "To EN Menu"
+    },
+    {
+      "id": "e5",
+      "sourceId": "n4",
+      "sourcePort": "out",
+      "targetId": "n6",
+      "targetPort": "in",
+      "label": "To AR Menu"
+    },
+    {
+      "id": "e6",
+      "sourceId": "n5",
+      "sourcePort": "key1",
+      "targetId": "n7",
+      "targetPort": "in",
+      "label": "EN Appointments"
+    },
+    {
+      "id": "e7",
+      "sourceId": "n6",
+      "sourcePort": "key1",
+      "targetId": "n8",
+      "targetPort": "in",
+      "label": "AR Appointments"
+    },
+    {
+      "id": "e8",
+      "sourceId": "n5",
+      "sourcePort": "key4",
+      "targetId": "n9",
+      "targetPort": "in",
+      "label": "EN Emergency"
+    },
+    {
+      "id": "e9",
+      "sourceId": "n6",
+      "sourcePort": "key4",
+      "targetId": "n9",
+      "targetPort": "in",
+      "label": "AR Emergency"
+    },
+    {
+      "id": "e10",
+      "sourceId": "n5",
+      "sourcePort": "key0",
+      "targetId": "n10",
+      "targetPort": "in",
+      "label": "EN Operator"
+    },
+    {
+      "id": "e11",
+      "sourceId": "n6",
+      "sourcePort": "key0",
+      "targetId": "n10",
+      "targetPort": "in",
+      "label": "AR Operator"
+    },
+    {
+      "id": "e12",
+      "sourceId": "n7",
+      "sourcePort": "out",
+      "targetId": "n11",
+      "targetPort": "in",
+      "label": "Close EN"
+    },
+    {
+      "id": "e13",
+      "sourceId": "n8",
+      "sourcePort": "out",
+      "targetId": "n11",
+      "targetPort": "in",
+      "label": "Close AR"
+    },
+    {
+      "id": "e14",
+      "sourceId": "n9",
+      "sourcePort": "fail",
+      "targetId": "n11",
+      "targetPort": "in",
+      "label": "Emergency fail"
+    },
+    {
+      "id": "e15",
+      "sourceId": "n10",
+      "sourcePort": "fail",
+      "targetId": "n11",
+      "targetPort": "in",
+      "label": "Operator fail"
+    }
+  ]
+}
